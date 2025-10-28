@@ -1,12 +1,34 @@
-import { View, Text } from "react-native";
-import React from "react";
+// src/app/_layout.jsx
 import { Stack } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 
 const RootNavigation = () => {
     return (
-        <Stack>
-            <Stack.Screen name="index" />
-        </Stack>
+        <>
+            <Stack screenOptions={{
+                headerStyle: {
+                    backgroundColor: '#6366F1',
+                },
+                headerTintColor: '#fff',
+                headerTitleStyle: {
+                    fontWeight: 'bold',
+                },
+            }}>
+                <Stack.Screen
+                    name="index"
+                    options={{
+                        title: 'BillBuddy',
+                    }}
+                />
+                <Stack.Screen
+                    name="(tabs)"
+                    options={{
+                        headerShown: false
+                    }}
+                />
+            </Stack>
+            <StatusBar style="light" />
+        </>
     );
 };
 
