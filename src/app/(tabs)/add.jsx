@@ -4,8 +4,12 @@ import React, { useState, useRef } from "react";
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { useAuth } from "../../contexts/AuthContext";
+import { db } from "../../firebase/config";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 
 const AddBill = () => {
+    const { user } = useAuth();
     const [billName, setBillName] = useState('');
     const [amount, setAmount] = useState('');
     const [category, setCategory] = useState('');
@@ -13,6 +17,7 @@ const AddBill = () => {
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [notes, setNotes] = useState('');
     const [isRecurring, setIsRecurring] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
 
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(30)).current;
@@ -43,43 +48,61 @@ const AddBill = () => {
         { id: 'other', name: 'Other', icon: 'ellipsis-horizontal', color: '#6B7280' },
     ];
 
-    const handleAddBill = () => {
+    const handleAddBill = async () => {
         if (!billName.trim() || !amount || !category) {
             Alert.alert('Missing Information', 'Please fill in all required fields.');
             return;
         }
 
-        const billData = {
-            id: Date.now().toString(),
-            name: billName.trim(),
-            amount: parseFloat(amount),
-            category,
-            dueDate: dueDate.toISOString().split('T')[0],
-            notes: notes.trim(),
-            isRecurring,
-            status: 'pending',
-            createdAt: new Date().toISOString(),
-        };
+        if (!user) {
+            Alert.alert('Error', 'You must be logged in to add bills.');
+            return;
+        }
 
-        // TODO: Save to storage/context
-        console.log('New Bill:', billData);
+        setIsLoading(true);
 
-        Alert.alert(
-            'Success!',
-            `"${billData.name}" has been added successfully.`,
-            [
-                {
-                    text: 'Add Another',
-                    onPress: resetForm,
-                    style: 'default',
-                },
-                {
-                    text: 'View Bills',
-                    onPress: () => console.log('Navigate to bills'),
-                    style: 'cancel',
-                },
-            ]
-        );
+        try {
+            const billData = {
+                name: billName.trim(),
+                amount: parseFloat(amount),
+                category,
+                dueDate: dueDate.toISOString().split('T')[0],
+                dueTimestamp: dueDate,
+                notes: notes.trim(),
+                isRecurring,
+                status: 'pending',
+                userId: user.uid,
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp(),
+            };
+
+            // Save to Firestore
+            const docRef = await addDoc(collection(db, 'bills'), billData);
+
+            console.log('Bill added with ID: ', docRef.id);
+
+            Alert.alert(
+                'Success!',
+                `"${billData.name}" has been added successfully.`,
+                [
+                    {
+                        text: 'Add Another',
+                        onPress: resetForm,
+                        style: 'default',
+                    },
+                    {
+                        text: 'View Bills',
+                        onPress: () => console.log('Navigate to bills'),
+                        style: 'cancel',
+                    },
+                ]
+            );
+        } catch (error) {
+            console.error('Error adding bill: ', error);
+            Alert.alert('Error', 'Failed to add bill. Please try again.');
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const resetForm = () => {
@@ -271,10 +294,10 @@ const AddBill = () => {
                 <TouchableOpacity
                     style={[
                         styles.button,
-                        (!billName || !amount || !category) && styles.buttonDisabled
+                        (!billName || !amount || !category || isLoading) && styles.buttonDisabled
                     ]}
                     onPress={handleAddBill}
-                    disabled={!billName || !amount || !category}
+                    disabled={!billName || !amount || !category || isLoading}
                 >
                     <LinearGradient
                         colors={['#6366F1', '#8B5CF6']}
@@ -282,8 +305,14 @@ const AddBill = () => {
                         end={{ x: 1, y: 0 }}
                         style={styles.buttonGradient}
                     >
-                        <Ionicons name="add-circle-outline" size={20} color="#fff" />
-                        <Text style={styles.buttonText}>Add Bill</Text>
+                        {isLoading ? (
+                            <Ionicons name="refresh" size={20} color="#fff" />
+                        ) : (
+                            <Ionicons name="add-circle-outline" size={20} color="#fff" />
+                        )}
+                        <Text style={styles.buttonText}>
+                            {isLoading ? 'Adding...' : 'Add Bill'}
+                        </Text>
                     </LinearGradient>
                 </TouchableOpacity>
 
