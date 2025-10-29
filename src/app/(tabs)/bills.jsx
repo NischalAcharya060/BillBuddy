@@ -1,11 +1,10 @@
 // src/app/(tabs)/bills.jsx
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Animated, ScrollView, Alert, RefreshControl, Modal } from "react-native";
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Animated, ScrollView, Alert, RefreshControl, Modal, ActivityIndicator } from "react-native";
 import React, { useState, useRef, useEffect } from "react";
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from "../../contexts/AuthContext";
 import { db } from "../../firebase/config";
-import { collection, query, where, onSnapshot, orderBy, updateDoc, doc, deleteDoc, getDocs } from "firebase/firestore";
+import { collection, query, where, onSnapshot, orderBy, updateDoc, doc, deleteDoc } from "firebase/firestore";
 import { useRouter } from "expo-router";
 
 const Bills = () => {
@@ -21,62 +20,29 @@ const Bills = () => {
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(30)).current;
 
-    const fetchBills = async () => {
-        if (!user) return;
-
-        try {
-            // Create query for user's bills ordered by due date
-            const billsQuery = query(
-                collection(db, 'bills'),
-                where('userId', '==', user.uid),
-                orderBy('dueTimestamp', 'asc')
-            );
-
-            const querySnapshot = await getDocs(billsQuery);
-            const billsData = [];
-            querySnapshot.forEach((doc) => {
-                const billData = doc.data();
-                billsData.push({
-                    id: doc.id,
-                    ...billData,
-                    dueTimestamp: billData.dueTimestamp?.toDate?.() || new Date(billData.dueDate),
-                    createdAt: billData.createdAt?.toDate?.() || new Date(),
-                });
-            });
-
-            // Calculate status for each bill
-            const billsWithStatus = billsData.map(bill => {
-                const status = calculateBillStatus(bill);
-                return {
-                    ...bill,
-                    status,
-                    isPaid: status === 'paid'
-                };
-            });
-
-            setBills(billsWithStatus);
-
-            // Start animations after data loads
-            Animated.parallel([
-                Animated.timing(fadeAnim, {
-                    toValue: 1,
-                    duration: 600,
-                    useNativeDriver: true,
-                }),
-                Animated.timing(slideAnim, {
-                    toValue: 0,
-                    duration: 600,
-                    useNativeDriver: true,
-                })
-            ]).start();
-        } catch (error) {
-            console.error('Error fetching bills:', error);
-            Alert.alert('Error', 'Failed to load bills. Please try again.');
-        } finally {
-            setLoading(false);
-            setRefreshing(false);
-        }
+    const categories = {
+        electricity: { name: 'Electricity', icon: 'flash', color: '#F59E0B' },
+        rent: { name: 'Rent', icon: 'home', color: '#6366F1' },
+        wifi: { name: 'Wi-Fi', icon: 'wifi', color: '#10B981' },
+        subscriptions: { name: 'Subscriptions', icon: 'play', color: '#EC4899' },
+        water: { name: 'Water', icon: 'water', color: '#06B6D4' },
+        gas: { name: 'Gas', icon: 'flame', color: '#EF4444' },
+        phone: { name: 'Phone', icon: 'call', color: '#8B5CF6' },
+        other: { name: 'Other', icon: 'ellipsis-horizontal', color: '#6B7280' },
     };
+
+    const filters = [
+        { id: 'all', name: 'All Bills' },
+        { id: 'pending', name: 'Pending' },
+        { id: 'paid', name: 'Paid' },
+        { id: 'overdue', name: 'Overdue' },
+    ];
+
+    const sortOptions = [
+        { id: 'dueDate', name: 'Due Date' },
+        { id: 'amount', name: 'Amount' },
+        { id: 'name', name: 'Name' },
+    ];
 
     useEffect(() => {
         if (!user) return;
@@ -143,41 +109,20 @@ const Bills = () => {
 
     const calculateBillStatus = (bill) => {
         const today = new Date();
-        const dueDate = bill.dueTimestamp;
+        today.setHours(0, 0, 0, 0);
+
+        const dueDate = new Date(bill.dueTimestamp);
+        dueDate.setHours(0, 0, 0, 0);
 
         // If bill is marked as paid in Firestore
         if (bill.status === 'paid') return 'paid';
 
-        // If due date is in the past
+        // If due date is in the past and not paid
         if (dueDate < today) return 'overdue';
 
         // Otherwise pending
         return 'pending';
     };
-
-    const categories = {
-        electricity: { name: 'Electricity', icon: 'flash', color: '#F59E0B' },
-        rent: { name: 'Rent', icon: 'home', color: '#6366F1' },
-        wifi: { name: 'Wi-Fi', icon: 'wifi', color: '#10B981' },
-        subscriptions: { name: 'Subscriptions', icon: 'play', color: '#EC4899' },
-        water: { name: 'Water', icon: 'water', color: '#06B6D4' },
-        gas: { name: 'Gas', icon: 'flame', color: '#EF4444' },
-        phone: { name: 'Phone', icon: 'call', color: '#8B5CF6' },
-        other: { name: 'Other', icon: 'ellipsis-horizontal', color: '#6B7280' },
-    };
-
-    const filters = [
-        { id: 'all', name: 'All Bills' },
-        { id: 'pending', name: 'Pending' },
-        { id: 'paid', name: 'Paid' },
-        { id: 'overdue', name: 'Overdue' },
-    ];
-
-    const sortOptions = [
-        { id: 'dueDate', name: 'Due Date' },
-        { id: 'amount', name: 'Amount' },
-        { id: 'name', name: 'Name' },
-    ];
 
     const filteredAndSortedBills = bills
         .filter(bill => {
@@ -217,18 +162,13 @@ const Bills = () => {
     };
 
     const handleEditBill = (bill) => {
-        // Navigate to add bill screen with bill data for editing
+        setEditModalVisible(false);
+
+        // Navigate to the dedicated edit screen
         router.push({
-            pathname: '/(tabs)/add',
+            pathname: '/(tabs)/edit-bill',
             params: {
-                edit: 'true',
-                billId: bill.id,
-                billName: bill.name,
-                amount: bill.amount.toString(),
-                category: bill.category,
-                dueDate: bill.dueDate,
-                notes: bill.notes || '',
-                isRecurring: bill.isRecurring ? 'true' : 'false'
+                billId: bill.id
             }
         });
     };
@@ -255,7 +195,7 @@ const Bills = () => {
         try {
             const billRef = doc(db, 'bills', billId);
             await deleteDoc(billRef);
-            Alert.alert('Success', 'Bill deleted successfully.');
+            // Success handled by real-time listener
         } catch (error) {
             console.error('Error deleting bill:', error);
             Alert.alert('Error', 'Failed to delete bill. Please try again.');
@@ -295,7 +235,11 @@ const Bills = () => {
 
     const getDaysUntilDue = (dueDate) => {
         const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
         const due = new Date(dueDate);
+        due.setHours(0, 0, 0, 0);
+
         const diffTime = due - today;
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
         return diffDays;
@@ -303,7 +247,6 @@ const Bills = () => {
 
     const onRefresh = async () => {
         setRefreshing(true);
-        await fetchBills();
     };
 
     const BillCard = ({ item }) => {
@@ -341,7 +284,7 @@ const Bills = () => {
                             styles.dueDate,
                             isOverdue && styles.overdueDate
                         ]}>
-                            Due {formatDate(item.dueTimestamp || item.dueDate)} • {isOverdue ? 'Overdue' : `${daysUntilDue} days`}
+                            Due {formatDate(item.dueTimestamp || item.dueDate)} • {isOverdue ? `${Math.abs(daysUntilDue)} days overdue` : `${daysUntilDue} days`}
                         </Text>
                     </View>
 
@@ -407,6 +350,9 @@ const Bills = () => {
         const pendingBills = bills.filter(bill => bill.status === 'pending').length;
         const overdueBills = bills.filter(bill => bill.status === 'overdue').length;
         const totalAmount = bills.reduce((sum, bill) => sum + bill.amount, 0);
+        const pendingAmount = bills
+            .filter(bill => bill.status !== 'paid')
+            .reduce((sum, bill) => sum + bill.amount, 0);
 
         return (
             <Animated.View
@@ -434,8 +380,8 @@ const Bills = () => {
                 </View>
                 <View style={styles.statDivider} />
                 <View style={styles.statItem}>
-                    <Text style={[styles.statValue, { color: '#6366F1' }]}>${totalAmount.toFixed(0)}</Text>
-                    <Text style={styles.statLabel}>Total</Text>
+                    <Text style={[styles.statValue, { color: '#6366F1' }]}>${pendingAmount.toFixed(0)}</Text>
+                    <Text style={styles.statLabel}>Due</Text>
                 </View>
             </Animated.View>
         );
@@ -469,6 +415,9 @@ const Bills = () => {
                             <View style={styles.billPreviewInfo}>
                                 <Text style={styles.billPreviewName}>{selectedBill.name}</Text>
                                 <Text style={styles.billPreviewAmount}>${selectedBill.amount.toFixed(2)}</Text>
+                                <Text style={styles.billPreviewDue}>
+                                    Due {formatDate(selectedBill.dueTimestamp || selectedBill.dueDate)}
+                                </Text>
                             </View>
                         </View>
                     )}
@@ -476,10 +425,7 @@ const Bills = () => {
                     <View style={styles.modalActions}>
                         <TouchableOpacity
                             style={[styles.modalButton, styles.editButtonModal]}
-                            onPress={() => {
-                                setEditModalVisible(false);
-                                handleEditBill(selectedBill);
-                            }}
+                            onPress={() => handleEditBill(selectedBill)}
                         >
                             <Ionicons name="create-outline" size={20} color="#6366F1" />
                             <Text style={[styles.modalButtonText, { color: '#6366F1' }]}>Edit Bill</Text>
