@@ -1,10 +1,15 @@
 // src/app/(tabs)/index.jsx
-import { View, Text, StyleSheet, ScrollView, Animated } from "react-native";
+import { View, Text, StyleSheet, ScrollView, Animated, TouchableOpacity, Alert } from "react-native";
 import React, { useEffect, useRef } from "react";
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from "../../contexts/AuthContext";
+import { useRouter } from "expo-router";
 
 const Dashboard = () => {
+    const { user, logout } = useAuth();
+    const router = useRouter();
+
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(20)).current;
 
@@ -22,6 +27,51 @@ const Dashboard = () => {
             })
         ]).start();
     }, []);
+
+    const handleLogout = () => {
+        Alert.alert(
+            "Logout",
+            "Are you sure you want to logout?",
+            [
+                {
+                    text: "Cancel",
+                    style: "cancel"
+                },
+                {
+                    text: "Logout",
+                    style: "destructive",
+                    onPress: async () => {
+                        const result = await logout();
+                        if (result.success) {
+                            router.replace('/(auth)/login');
+                        } else {
+                            Alert.alert('Logout Failed', result.error);
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
+    const getUserInitial = () => {
+        if (user?.displayName) {
+            return user.displayName.charAt(0).toUpperCase();
+        }
+        if (user?.email) {
+            return user.email.charAt(0).toUpperCase();
+        }
+        return "U";
+    };
+
+    const getUserName = () => {
+        if (user?.displayName) {
+            return user.displayName;
+        }
+        if (user?.email) {
+            return user.email.split('@')[0];
+        }
+        return "User";
+    };
 
     const StatCard = ({ title, value, subtitle, icon, color, trend }) => (
         <Animated.View
@@ -63,12 +113,12 @@ const Dashboard = () => {
     );
 
     const QuickAction = ({ title, icon, color, onPress }) => (
-        <View style={styles.quickAction}>
+        <TouchableOpacity style={styles.quickAction} onPress={onPress}>
             <View style={[styles.actionIcon, { backgroundColor: color }]}>
                 <Ionicons name={icon} size={24} color="#fff" />
             </View>
             <Text style={styles.actionTitle}>{title}</Text>
-        </View>
+        </TouchableOpacity>
     );
 
     return (
@@ -80,12 +130,17 @@ const Dashboard = () => {
             {/* Header */}
             <View style={styles.header}>
                 <View>
-                    <Text style={styles.greeting}>Good morning! 👋</Text>
+                    <Text style={styles.greeting}>Good morning, {getUserName()}! 👋</Text>
                     <Text style={styles.title}>Dashboard Overview</Text>
                 </View>
-                <View style={styles.avatar}>
-                    <Text style={styles.avatarText}>U</Text>
-                </View>
+                <TouchableOpacity style={styles.avatarContainer} onPress={handleLogout}>
+                    <View style={styles.avatar}>
+                        <Text style={styles.avatarText}>{getUserInitial()}</Text>
+                    </View>
+                    <View style={styles.logoutBadge}>
+                        <Ionicons name="log-out-outline" size={12} color="#fff" />
+                    </View>
+                </TouchableOpacity>
             </View>
 
             {/* Stats Grid */}
@@ -136,22 +191,58 @@ const Dashboard = () => {
                         title="Add Bill"
                         icon="add-circle"
                         color="#6366F1"
+                        onPress={() => console.log("Add Bill pressed")}
                     />
                     <QuickAction
                         title="Split Bill"
                         icon="people"
                         color="#10B981"
+                        onPress={() => console.log("Split Bill pressed")}
                     />
                     <QuickAction
                         title="Analytics"
                         icon="bar-chart"
                         color="#F59E0B"
+                        onPress={() => console.log("Analytics pressed")}
                     />
                     <QuickAction
-                        title="Export"
-                        icon="download"
-                        color="#EC4899"
+                        title="Settings"
+                        icon="settings"
+                        color="#8B5CF6"
+                        onPress={() => console.log("Settings pressed")}
                     />
+                </View>
+            </Animated.View>
+
+            {/* Profile Section */}
+            <Animated.View
+                style={[
+                    styles.section,
+                    {
+                        opacity: fadeAnim,
+                        transform: [{ translateY: slideAnim }]
+                    }
+                ]}
+            >
+                <View style={styles.sectionHeader}>
+                    <Text style={styles.sectionTitle}>Your Profile</Text>
+                </View>
+                <View style={styles.profileCard}>
+                    <View style={styles.profileInfo}>
+                        <View style={styles.profileAvatar}>
+                            <Text style={styles.profileAvatarText}>{getUserInitial()}</Text>
+                        </View>
+                        <View style={styles.profileDetails}>
+                            <Text style={styles.profileName}>
+                                {user?.displayName || getUserName()}
+                            </Text>
+                            <Text style={styles.profileEmail}>{user?.email}</Text>
+                        </View>
+                    </View>
+                    <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+                        <Ionicons name="log-out-outline" size={20} color="#EF4444" />
+                        <Text style={styles.logoutButtonText}>Logout</Text>
+                    </TouchableOpacity>
                 </View>
             </Animated.View>
 
@@ -225,6 +316,9 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         color: '#1F2937',
     },
+    avatarContainer: {
+        position: 'relative',
+    },
     avatar: {
         width: 44,
         height: 44,
@@ -237,6 +331,19 @@ const styles = StyleSheet.create({
         color: '#fff',
         fontSize: 18,
         fontWeight: '600',
+    },
+    logoutBadge: {
+        position: 'absolute',
+        top: -2,
+        right: -2,
+        backgroundColor: '#EF4444',
+        width: 16,
+        height: 16,
+        borderRadius: 8,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 2,
+        borderColor: '#fff',
     },
     statsGrid: {
         flexDirection: 'row',
@@ -353,6 +460,65 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         color: '#374151',
         textAlign: 'center',
+    },
+    profileCard: {
+        backgroundColor: '#fff',
+        padding: 20,
+        borderRadius: 16,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 2,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    profileInfo: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+    },
+    profileAvatar: {
+        width: 50,
+        height: 50,
+        borderRadius: 25,
+        backgroundColor: '#6366F1',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+    },
+    profileAvatarText: {
+        color: '#fff',
+        fontSize: 20,
+        fontWeight: '600',
+    },
+    profileDetails: {
+        flex: 1,
+    },
+    profileName: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#1F2937',
+        marginBottom: 2,
+    },
+    profileEmail: {
+        fontSize: 14,
+        color: '#6B7280',
+    },
+    logoutButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 8,
+        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    },
+    logoutButtonText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#EF4444',
+        marginLeft: 6,
     },
     emptyState: {
         backgroundColor: '#fff',

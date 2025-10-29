@@ -1,8 +1,21 @@
 // src/app/_layout.jsx
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { AuthProvider, useAuth } from "../contexts/AuthContext";
+import { ActivityIndicator, View } from "react-native";
 
-const RootNavigation = () => {
+function RootLayoutNav() {
+    const { loading } = useAuth();
+
+    if (loading) {
+        return (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#6366F1' }}>
+                <ActivityIndicator size="large" color="#fff" />
+                <StatusBar style="light" />
+            </View>
+        );
+    }
+
     return (
         <>
             <Stack
@@ -11,7 +24,7 @@ const RootNavigation = () => {
                         backgroundColor: '#6366F1',
                         shadowColor: '#000',
                         shadowOffset: { width: 0, height: 4 },
-                        shadowOpacity: 0.15,
+                        shadowOpacity: 0.1,
                         shadowRadius: 12,
                         elevation: 8,
                     },
@@ -32,12 +45,13 @@ const RootNavigation = () => {
                 <Stack.Screen
                     name="index"
                     options={{
-                        title: '💰 BillBuddy',
-                        headerStyle: {
-                            backgroundColor: '#6366F1',
-                            shadowColor: 'transparent',
-                            elevation: 0,
-                        },
+                        headerShown: false,
+                    }}
+                />
+                <Stack.Screen
+                    name="(auth)"
+                    options={{
+                        headerShown: false,
                     }}
                 />
                 <Stack.Screen
@@ -47,13 +61,15 @@ const RootNavigation = () => {
                     }}
                 />
             </Stack>
-
-            <StatusBar
-                style="light"
-                backgroundColor="#6366F1"
-            />
+            <StatusBar style="light" />
         </>
     );
-};
+}
 
-export default RootNavigation;
+export default function RootLayout() {
+    return (
+        <AuthProvider>
+            <RootLayoutNav />
+        </AuthProvider>
+    );
+}
