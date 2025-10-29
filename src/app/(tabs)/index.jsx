@@ -1,32 +1,141 @@
 // src/app/(tabs)/index.jsx
-import { View, Text, StyleSheet, ScrollView, Animated, TouchableOpacity, Alert } from "react-native";
-import React, { useEffect, useRef } from "react";
+import { View, Text, StyleSheet, ScrollView, Animated, TouchableOpacity, Alert, RefreshControl } from "react-native";
+import React, { useEffect, useRef, useState } from "react";
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from "../../contexts/AuthContext";
 import { useRouter } from "expo-router";
+import { db } from "../../firebase/config";
+import { collection, query, where, onSnapshot, orderBy } from "firebase/firestore";
 
 const Dashboard = () => {
     const { user, logout } = useAuth();
     const router = useRouter();
+    const [bills, setBills] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
 
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(20)).current;
 
     useEffect(() => {
-        Animated.parallel([
-            Animated.timing(fadeAnim, {
-                toValue: 1,
-                duration: 600,
-                useNativeDriver: true,
-            }),
-            Animated.timing(slideAnim, {
-                toValue: 0,
-                duration: 600,
-                useNativeDriver: true,
+        if (!user) return;
+
+        // Set up real-time listener for user's bills
+        const billsQuery = query(
+            collection(db, 'bills'),
+            where('userId', '==', user.uid),
+            orderBy('dueTimestamp', 'asc')
+        );
+
+        const unsubscribe = onSnapshot(billsQuery,
+            (querySnapshot) => {
+                const billsData = [];
+                querySnapshot.forEach((doc) => {
+                    const billData = doc.data();
+                    billsData.push({
+                        id: doc.id,
+                        ...billData,
+                        dueTimestamp: billData.dueTimestamp?.toDate?.() || new Date(billData.dueDate),
+                        createdAt: billData.createdAt?.toDate?.() || new Date(),
+                    });
+                });
+
+                // Calculate status for each bill
+                const billsWithStatus = billsData.map(bill => {
+                    const status = calculateBillStatus(bill);
+                    return {
+                        ...bill,
+                        status,
+                        isPaid: status === 'paid'
+                    };
+                });
+
+                setBills(billsWithStatus);
+                setLoading(false);
+                setRefreshing(false);
+
+                // Start animations after data loads
+                Animated.parallel([
+                    Animated.timing(fadeAnim, {
+                        toValue: 1,
+                        duration: 600,
+                        useNativeDriver: true,
+                    }),
+                    Animated.timing(slideAnim, {
+                        toValue: 0,
+                        duration: 600,
+                        useNativeDriver: true,
+                    })
+                ]).start();
+            },
+            (error) => {
+                console.error('Error fetching bills:', error);
+                setLoading(false);
+                setRefreshing(false);
+            }
+        );
+
+        return () => unsubscribe();
+    }, [user]);
+
+    const calculateBillStatus = (bill) => {
+        const today = new Date();
+        const dueDate = bill.dueTimestamp;
+
+        // If bill is marked as paid in Firestore
+        if (bill.status === 'paid') return 'paid';
+
+        // If due date is in the past
+        if (dueDate < today) return 'overdue';
+
+        // Otherwise pending
+        return 'pending';
+    };
+
+    // Calculate dashboard statistics
+    const calculateStats = () => {
+        const today = new Date();
+        const thisMonth = today.getMonth();
+        const thisYear = today.getFullYear();
+
+        // Monthly spending (paid bills this month)
+        const monthlySpending = bills
+            .filter(bill => {
+                if (bill.status !== 'paid') return false;
+                const paidDate = bill.paidAt?.toDate?.() || bill.updatedAt?.toDate?.() || new Date();
+                return paidDate.getMonth() === thisMonth && paidDate.getFullYear() === thisYear;
             })
-        ]).start();
-    }, []);
+            .reduce((sum, bill) => sum + bill.amount, 0);
+
+        // Upcoming bills (due within next 7 days)
+        const upcomingBills = bills.filter(bill => {
+            if (bill.status === 'paid') return false;
+            const dueDate = bill.dueTimestamp;
+            const diffTime = dueDate - today;
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            return diffDays >= 0 && diffDays <= 7;
+        });
+
+        // Bills paid this month
+        const billsPaidThisMonth = bills.filter(bill => {
+            if (bill.status !== 'paid') return false;
+            const paidDate = bill.paidAt?.toDate?.() || bill.updatedAt?.toDate?.() || new Date();
+            return paidDate.getMonth() === thisMonth && paidDate.getFullYear() === thisYear;
+        });
+
+        // Total savings (placeholder - you might want to calculate this differently)
+        const totalSavings = monthlySpending * 0.1; // Example: 10% of spending as savings
+
+        return {
+            monthlySpending,
+            upcomingBills: upcomingBills.length,
+            billsPaid: billsPaidThisMonth.length,
+            totalSavings
+        };
+    };
+
+    const stats = calculateStats();
 
     const handleLogout = () => {
         Alert.alert(
@@ -53,6 +162,11 @@ const Dashboard = () => {
         );
     };
 
+    const onRefresh = () => {
+        setRefreshing(true);
+        // The real-time listener will automatically update the data
+    };
+
     const getUserInitial = () => {
         if (user?.displayName) {
             return user.displayName.charAt(0).toUpperCase();
@@ -71,6 +185,13 @@ const Dashboard = () => {
             return user.email.split('@')[0];
         }
         return "User";
+    };
+
+    const getGreeting = () => {
+        const hour = new Date().getHours();
+        if (hour < 12) return "Good morning";
+        if (hour < 17) return "Good afternoon";
+        return "Good evening";
     };
 
     const StatCard = ({ title, value, subtitle, icon, color, trend }) => (
@@ -121,16 +242,64 @@ const Dashboard = () => {
         </TouchableOpacity>
     );
 
+    const UpcomingBillItem = ({ bill }) => {
+        const categoryColors = {
+            electricity: '#F59E0B',
+            rent: '#6366F1',
+            wifi: '#10B981',
+            subscriptions: '#EC4899',
+            water: '#06B6D4',
+            gas: '#EF4444',
+            phone: '#8B5CF6',
+            other: '#6B7280',
+        };
+
+        const getDaysUntilDue = (dueDate) => {
+            const today = new Date();
+            const due = new Date(dueDate);
+            const diffTime = due - today;
+            return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        };
+
+        const daysUntilDue = getDaysUntilDue(bill.dueTimestamp || bill.dueDate);
+        const isOverdue = daysUntilDue < 0;
+
+        return (
+            <View style={styles.upcomingBillItem}>
+                <View style={[styles.billColorDot, { backgroundColor: categoryColors[bill.category] || '#6B7280' }]} />
+                <View style={styles.billInfo}>
+                    <Text style={styles.billName}>{bill.name}</Text>
+                    <Text style={styles.billDueDate}>
+                        Due {isOverdue ? 'Overdue' : `in ${daysUntilDue} days`}
+                    </Text>
+                </View>
+                <Text style={styles.billAmount}>${bill.amount.toFixed(2)}</Text>
+            </View>
+        );
+    };
+
+    const upcomingBills = bills
+        .filter(bill => bill.status === 'pending' || bill.status === 'overdue')
+        .slice(0, 3); // Show only 3 upcoming bills
+
     return (
         <ScrollView
             style={styles.container}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.scrollContent}
+            refreshControl={
+                <RefreshControl
+                    refreshing={refreshing}
+                    onRefresh={onRefresh}
+                    colors={['#6366F1']}
+                    tintColor="#6366F1"
+                />
+            }
         >
             {/* Header */}
             <View style={styles.header}>
                 <View>
-                    <Text style={styles.greeting}>Good morning, {getUserName()}! 👋</Text>
+                    <Text style={styles.greeting}>{getGreeting()}, {getUserName()}! 👋</Text>
                     <Text style={styles.title}>Dashboard Overview</Text>
                 </View>
                 <TouchableOpacity style={styles.avatarContainer} onPress={handleLogout}>
@@ -147,28 +316,28 @@ const Dashboard = () => {
             <View style={styles.statsGrid}>
                 <StatCard
                     title="Monthly Spending"
-                    value="$0.00"
+                    value={`$${stats.monthlySpending.toFixed(2)}`}
                     subtitle="This month"
                     icon="wallet-outline"
                     color="#6366F1"
                 />
                 <StatCard
                     title="Upcoming Bills"
-                    value="0"
+                    value={stats.upcomingBills.toString()}
                     subtitle="Due this week"
                     icon="calendar-outline"
                     color="#10B981"
                 />
                 <StatCard
                     title="Bills Paid"
-                    value="0"
+                    value={stats.billsPaid.toString()}
                     subtitle="This month"
                     icon="checkmark-circle-outline"
                     color="#F59E0B"
                 />
                 <StatCard
                     title="Savings"
-                    value="$0.00"
+                    value={`$${stats.totalSavings.toFixed(2)}`}
                     subtitle="Total saved"
                     icon="trending-up-outline"
                     color="#EC4899"
@@ -191,26 +360,80 @@ const Dashboard = () => {
                         title="Add Bill"
                         icon="add-circle"
                         color="#6366F1"
-                        onPress={() => console.log("Add Bill pressed")}
+                        onPress={() => router.push('/(tabs)/add')}
                     />
                     <QuickAction
-                        title="Split Bill"
-                        icon="people"
+                        title="My Bills"
+                        icon="document-text"
                         color="#10B981"
-                        onPress={() => console.log("Split Bill pressed")}
+                        onPress={() => router.push('/(tabs)/bills')}
                     />
                     <QuickAction
                         title="Analytics"
                         icon="bar-chart"
                         color="#F59E0B"
-                        onPress={() => console.log("Analytics pressed")}
+                        onPress={() => router.push('/(tabs)/analytics')}
                     />
                     <QuickAction
-                        title="Settings"
-                        icon="settings"
+                        title="Split Bill"
+                        icon="people"
                         color="#8B5CF6"
-                        onPress={() => console.log("Settings pressed")}
+                        onPress={() => router.push('/(tabs)/split')}
                     />
+                </View>
+            </Animated.View>
+
+            {/* Upcoming Bills */}
+            <Animated.View
+                style={[
+                    styles.section,
+                    {
+                        opacity: fadeAnim,
+                        transform: [{ translateY: slideAnim }]
+                    }
+                ]}
+            >
+                <View style={styles.sectionHeader}>
+                    <Text style={styles.sectionTitle}>Upcoming Bills</Text>
+                    <TouchableOpacity onPress={() => router.push('/(tabs)/bills')}>
+                        <Text style={styles.seeAll}>See all</Text>
+                    </TouchableOpacity>
+                </View>
+                {upcomingBills.length === 0 ? (
+                    <View style={styles.emptyState}>
+                        <Ionicons name="document-text-outline" size={48} color="#9CA3AF" />
+                        <Text style={styles.emptyTitle}>No upcoming bills</Text>
+                        <Text style={styles.emptySubtitle}>Add your first bill to get started</Text>
+                    </View>
+                ) : (
+                    <View style={styles.upcomingBillsList}>
+                        {upcomingBills.map((bill) => (
+                            <UpcomingBillItem key={bill.id} bill={bill} />
+                        ))}
+                    </View>
+                )}
+            </Animated.View>
+
+            {/* Recent Activity */}
+            <Animated.View
+                style={[
+                    styles.section,
+                    {
+                        opacity: fadeAnim,
+                        transform: [{ translateY: slideAnim }]
+                    }
+                ]}
+            >
+                <View style={styles.sectionHeader}>
+                    <Text style={styles.sectionTitle}>Recent Activity</Text>
+                    <TouchableOpacity onPress={() => router.push('/(tabs)/bills')}>
+                        <Text style={styles.seeAll}>See all</Text>
+                    </TouchableOpacity>
+                </View>
+                <View style={styles.emptyState}>
+                    <Ionicons name="time-outline" size={48} color="#9CA3AF" />
+                    <Text style={styles.emptyTitle}>No recent activity</Text>
+                    <Text style={styles.emptySubtitle}>Your activity will appear here</Text>
                 </View>
             </Animated.View>
 
@@ -237,54 +460,15 @@ const Dashboard = () => {
                                 {user?.displayName || getUserName()}
                             </Text>
                             <Text style={styles.profileEmail}>{user?.email}</Text>
+                            <Text style={styles.profileStats}>
+                                {bills.length} bills • ${stats.monthlySpending.toFixed(2)} spent this month
+                            </Text>
                         </View>
                     </View>
                     <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
                         <Ionicons name="log-out-outline" size={20} color="#EF4444" />
                         <Text style={styles.logoutButtonText}>Logout</Text>
                     </TouchableOpacity>
-                </View>
-            </Animated.View>
-
-            {/* Upcoming Bills */}
-            <Animated.View
-                style={[
-                    styles.section,
-                    {
-                        opacity: fadeAnim,
-                        transform: [{ translateY: slideAnim }]
-                    }
-                ]}
-            >
-                <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>Upcoming Bills</Text>
-                    <Text style={styles.seeAll}>See all</Text>
-                </View>
-                <View style={styles.emptyState}>
-                    <Ionicons name="document-text-outline" size={48} color="#9CA3AF" />
-                    <Text style={styles.emptyTitle}>No upcoming bills</Text>
-                    <Text style={styles.emptySubtitle}>Add your first bill to get started</Text>
-                </View>
-            </Animated.View>
-
-            {/* Recent Activity */}
-            <Animated.View
-                style={[
-                    styles.section,
-                    {
-                        opacity: fadeAnim,
-                        transform: [{ translateY: slideAnim }]
-                    }
-                ]}
-            >
-                <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>Recent Activity</Text>
-                    <Text style={styles.seeAll}>See all</Text>
-                </View>
-                <View style={styles.emptyState}>
-                    <Ionicons name="time-outline" size={48} color="#9CA3AF" />
-                    <Text style={styles.emptyTitle}>No recent activity</Text>
-                    <Text style={styles.emptySubtitle}>Your activity will appear here</Text>
                 </View>
             </Animated.View>
         </ScrollView>
@@ -461,6 +645,47 @@ const styles = StyleSheet.create({
         color: '#374151',
         textAlign: 'center',
     },
+    upcomingBillsList: {
+        backgroundColor: '#fff',
+        borderRadius: 16,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 2,
+        overflow: 'hidden',
+    },
+    upcomingBillItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F3F4F6',
+    },
+    billColorDot: {
+        width: 12,
+        height: 12,
+        borderRadius: 6,
+        marginRight: 12,
+    },
+    billInfo: {
+        flex: 1,
+    },
+    billName: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#1F2937',
+        marginBottom: 4,
+    },
+    billDueDate: {
+        fontSize: 14,
+        color: '#6B7280',
+    },
+    billAmount: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#1F2937',
+    },
     profileCard: {
         backgroundColor: '#fff',
         padding: 20,
@@ -505,6 +730,11 @@ const styles = StyleSheet.create({
     profileEmail: {
         fontSize: 14,
         color: '#6B7280',
+        marginBottom: 4,
+    },
+    profileStats: {
+        fontSize: 12,
+        color: '#9CA3AF',
     },
     logoutButton: {
         flexDirection: 'row',
