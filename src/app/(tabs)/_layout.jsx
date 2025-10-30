@@ -93,7 +93,7 @@ const TabsLayout = () => {
                             />
                         </LinearGradient>
                     ),
-                    tabBarLabel: () => null, // Hide label for add button
+                    tabBarLabel: () => null,
                 }}
             />
             <Tabs.Screen
@@ -124,6 +124,13 @@ const TabsLayout = () => {
                             />
                         </View>
                     ),
+                }}
+            />
+            {/* Hide edit-bill from tab bar */}
+            <Tabs.Screen
+                name="edit-bill"
+                options={{
+                    href: null,
                 }}
             />
         </Tabs>
