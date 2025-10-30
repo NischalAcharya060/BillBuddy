@@ -1,4 +1,14 @@
-import { View, Text, StyleSheet, ScrollView, Dimensions, Animated, RefreshControl } from "react-native";
+import {
+    View,
+    Text,
+    StyleSheet,
+    ScrollView,
+    Dimensions,
+    Animated,
+    RefreshControl,
+    TouchableOpacity,
+    ActivityIndicator
+} from "react-native";
 import React, { useState, useEffect, useRef } from "react";
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,8 +24,10 @@ const Analytics = () => {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [timeRange, setTimeRange] = useState('month');
+
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(30)).current;
+    const scaleAnim = useRef(new Animated.Value(0.95)).current;
 
     useEffect(() => {
         if (!user) return;
@@ -45,12 +57,18 @@ const Analytics = () => {
                 Animated.parallel([
                     Animated.timing(fadeAnim, {
                         toValue: 1,
-                        duration: 600,
+                        duration: 800,
                         useNativeDriver: true,
                     }),
                     Animated.timing(slideAnim, {
                         toValue: 0,
-                        duration: 600,
+                        duration: 800,
+                        useNativeDriver: true,
+                    }),
+                    Animated.spring(scaleAnim, {
+                        toValue: 1,
+                        tension: 20,
+                        friction: 7,
                         useNativeDriver: true,
                     })
                 ]).start();
@@ -93,14 +111,14 @@ const Analytics = () => {
         // Category spending
         const categorySpending = {};
         const categoryColors = {
-            electricity: '#F59E0B',
-            rent: '#6366F1',
-            wifi: '#10B981',
-            subscriptions: '#EC4899',
-            water: '#06B6D4',
-            gas: '#EF4444',
-            phone: '#8B5CF6',
-            other: '#6B7280',
+            electricity: { color: '#F59E0B', gradient: ['#F59E0B', '#D97706'] },
+            rent: { color: '#6366F1', gradient: ['#6366F1', '#8B5CF6'] },
+            wifi: { color: '#10B981', gradient: ['#10B981', '#059669'] },
+            subscriptions: { color: '#EC4899', gradient: ['#EC4899', '#DB2777'] },
+            water: { color: '#06B6D4', gradient: ['#06B6D4', '#0891B2'] },
+            gas: { color: '#EF4444', gradient: ['#EF4444', '#DC2626'] },
+            phone: { color: '#8B5CF6', gradient: ['#8B5CF6', '#7C3AED'] },
+            other: { color: '#6B7280', gradient: ['#6B7280', '#4B5563'] },
         };
 
         filteredBills.forEach(bill => {
@@ -128,7 +146,8 @@ const Analytics = () => {
 
             monthlyTrend.push({
                 month: month,
-                amount: monthlyTotal
+                amount: monthlyTotal,
+                fullMonth: date.toLocaleString('default', { month: 'long' })
             });
         }
 
@@ -149,7 +168,8 @@ const Analytics = () => {
             .map(([category, amount]) => ({
                 category,
                 amount,
-                color: categoryColors[category] || '#6B7280',
+                color: categoryColors[category]?.color || '#6B7280',
+                gradient: categoryColors[category]?.gradient || ['#6B7280', '#4B5563'],
                 percentage: totalSpent > 0 ? (amount / totalSpent * 100) : 0
             }));
 
@@ -167,47 +187,73 @@ const Analytics = () => {
 
     const analytics = calculateAnalytics();
 
-    const StatCard = ({ title, value, subtitle, icon, color }) => (
+    const StatCard = ({ title, value, subtitle, icon, gradient }) => (
         <Animated.View
             style={[
                 styles.statCard,
                 {
                     opacity: fadeAnim,
-                    transform: [{ translateY: slideAnim }]
+                    transform: [
+                        { translateY: slideAnim },
+                        { scale: scaleAnim }
+                    ]
                 }
             ]}
         >
             <LinearGradient
-                colors={[color, `${color}DD`]}
-                style={styles.statIcon}
+                colors={gradient}
+                style={styles.statGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
             >
-                <Ionicons name={icon} size={20} color="#fff" />
-            </LinearGradient>
-            <View style={styles.statContent}>
+                <View style={styles.statHeader}>
+                    <View style={styles.statIconContainer}>
+                        <Ionicons name={icon} size={20} color="#fff" />
+                    </View>
+                    <View style={styles.statTrend}>
+                        <Ionicons name="trending-up" size={14} color="#fff" />
+                    </View>
+                </View>
                 <Text style={styles.statValue}>{value}</Text>
                 <Text style={styles.statTitle}>{title}</Text>
                 <Text style={styles.statSubtitle}>{subtitle}</Text>
-            </View>
+            </LinearGradient>
         </Animated.View>
     );
 
     const TimeRangeSelector = () => (
         <View style={styles.timeRangeContainer}>
-            {['month', 'quarter', 'year'].map((range) => (
+            {[
+                { id: 'month', label: 'Month', icon: 'calendar' },
+                { id: 'quarter', label: 'Quarter', icon: 'calendar-outline' },
+                { id: 'year', label: 'Year', icon: 'calendar-sharp' }
+            ].map((range) => (
                 <TouchableOpacity
-                    key={range}
+                    key={range.id}
                     style={[
                         styles.timeRangeButton,
-                        timeRange === range && styles.timeRangeButtonActive
+                        timeRange === range.id && styles.timeRangeButtonActive
                     ]}
-                    onPress={() => setTimeRange(range)}
+                    onPress={() => setTimeRange(range.id)}
                 >
-                    <Text style={[
-                        styles.timeRangeText,
-                        timeRange === range && styles.timeRangeTextActive
-                    ]}>
-                        {range.charAt(0).toUpperCase() + range.slice(1)}
-                    </Text>
+                    <LinearGradient
+                        colors={timeRange === range.id ? ['#6366F1', '#8B5CF6'] : ['#F3F4F6', '#E5E7EB']}
+                        style={styles.timeRangeGradient}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                    >
+                        <Ionicons
+                            name={range.icon}
+                            size={16}
+                            color={timeRange === range.id ? '#fff' : '#6B7280'}
+                        />
+                        <Text style={[
+                            styles.timeRangeText,
+                            timeRange === range.id && styles.timeRangeTextActive
+                        ]}>
+                            {range.label}
+                        </Text>
+                    </LinearGradient>
                 </TouchableOpacity>
             ))}
         </View>
@@ -215,7 +261,7 @@ const Analytics = () => {
 
     // Custom Bar Chart Component
     const BarChart = ({ data }) => {
-        const maxValue = Math.max(...data.map(item => item.amount));
+        const maxValue = Math.max(...data.map(item => item.amount), 1);
 
         return (
             <View style={styles.barChartContainer}>
@@ -223,17 +269,21 @@ const Analytics = () => {
                     <View key={index} style={styles.barChartItem}>
                         <View style={styles.barLabelContainer}>
                             <Text style={styles.barLabel}>{item.month}</Text>
-                            <Text style={styles.barValue}>${item.amount.toFixed(0)}</Text>
+                            <Text style={styles.barValue}>
+                                ${item.amount > 0 ? item.amount.toFixed(0) : '0'}
+                            </Text>
                         </View>
                         <View style={styles.barBackground}>
-                            <View
+                            <LinearGradient
+                                colors={['#6366F1', '#8B5CF6']}
                                 style={[
                                     styles.barFill,
                                     {
-                                        width: `${maxValue > 0 ? (item.amount / maxValue) * 100 : 0}%`,
-                                        backgroundColor: '#6366F1'
+                                        width: `${(item.amount / maxValue) * 100}%`,
                                     }
                                 ]}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 0 }}
                             />
                         </View>
                     </View>
@@ -243,11 +293,16 @@ const Analytics = () => {
     };
 
     // Custom Progress Bar for Categories
-    const CategoryProgress = ({ category, amount, percentage, color }) => (
+    const CategoryProgress = ({ category, amount, percentage, gradient }) => (
         <View style={styles.categoryProgressItem}>
             <View style={styles.categoryProgressHeader}>
                 <View style={styles.categoryInfo}>
-                    <View style={[styles.categoryColor, { backgroundColor: color }]} />
+                    <LinearGradient
+                        colors={gradient}
+                        style={styles.categoryColor}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                    />
                     <Text style={styles.categoryName}>
                         {category.charAt(0).toUpperCase() + category.slice(1)}
                     </Text>
@@ -258,14 +313,44 @@ const Analytics = () => {
                 </View>
             </View>
             <View style={styles.progressBarBackground}>
-                <View
+                <LinearGradient
+                    colors={gradient}
                     style={[
                         styles.progressBarFill,
-                        { width: `${percentage}%`, backgroundColor: color }
+                        { width: `${percentage}%` }
                     ]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
                 />
             </View>
         </View>
+    );
+
+    const InsightCard = ({ title, value, subtitle, icon, gradient }) => (
+        <Animated.View
+            style={[
+                styles.insightCard,
+                {
+                    opacity: fadeAnim,
+                    transform: [
+                        { translateY: slideAnim },
+                        { scale: scaleAnim }
+                    ]
+                }
+            ]}
+        >
+            <LinearGradient
+                colors={gradient}
+                style={styles.insightGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+            >
+                <Ionicons name={icon} size={24} color="#fff" />
+                <Text style={styles.insightValue}>{value}</Text>
+                <Text style={styles.insightTitle}>{title}</Text>
+                <Text style={styles.insightSubtitle}>{subtitle}</Text>
+            </LinearGradient>
+        </Animated.View>
     );
 
     if (loading) {
@@ -276,7 +361,7 @@ const Analytics = () => {
                     <Text style={styles.subtitle}>Track your spending patterns</Text>
                 </View>
                 <View style={styles.loadingContainer}>
-                    <Ionicons name="stats-chart" size={48} color="#6366F1" />
+                    <ActivityIndicator size="large" color="#6366F1" />
                     <Text style={styles.loadingText}>Loading analytics...</Text>
                 </View>
             </View>
@@ -287,6 +372,7 @@ const Analytics = () => {
         <ScrollView
             style={styles.container}
             showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.scrollContent}
             refreshControl={
                 <RefreshControl
                     refreshing={refreshing}
@@ -306,44 +392,36 @@ const Analytics = () => {
             </View>
 
             {/* Overview Stats */}
-            <Animated.View
-                style={[
-                    styles.statsGrid,
-                    {
-                        opacity: fadeAnim,
-                        transform: [{ translateY: slideAnim }]
-                    }
-                ]}
-            >
+            <View style={styles.statsGrid}>
                 <StatCard
                     title="Total Spent"
-                    value={`$${analytics.totalSpent.toFixed(2)}`}
+                    value={`$${analytics.totalSpent.toFixed(0)}`}
                     subtitle={`${timeRange}ly total`}
                     icon="wallet-outline"
-                    color="#6366F1"
+                    gradient={['#6366F1', '#8B5CF6']}
                 />
                 <StatCard
                     title="Avg. Bill"
-                    value={`$${analytics.averageBill.toFixed(2)}`}
+                    value={`$${analytics.averageBill.toFixed(0)}`}
                     subtitle="Per bill"
                     icon="calculator-outline"
-                    color="#10B981"
+                    gradient={['#10B981', '#34D399']}
                 />
                 <StatCard
                     title="Paid Bills"
                     value={analytics.paidBills.toString()}
                     subtitle="Completed"
-                    icon="checkmark-circle-outline"
-                    color="#F59E0B"
+                    icon="checkmark-done"
+                    gradient={['#F59E0B', '#FBBF24']}
                 />
                 <StatCard
                     title="Recurring"
                     value={analytics.recurringBills.toString()}
                     subtitle="Auto-pay bills"
-                    icon="repeat-outline"
-                    color="#EC4899"
+                    icon="repeat"
+                    gradient={['#EC4899', '#F472B6']}
                 />
-            </Animated.View>
+            </View>
 
             {/* Spending Trend */}
             {analytics.monthlyTrend.some(item => item.amount > 0) && (
@@ -356,7 +434,10 @@ const Analytics = () => {
                         }
                     ]}
                 >
-                    <Text style={styles.sectionTitle}>Spending Trend</Text>
+                    <View style={styles.sectionHeader}>
+                        <Text style={styles.sectionTitle}>Spending Trend</Text>
+                        <Text style={styles.sectionSubtitle}>Last 6 months</Text>
+                    </View>
                     <BarChart data={analytics.monthlyTrend} />
                 </Animated.View>
             )}
@@ -372,7 +453,10 @@ const Analytics = () => {
                         }
                     ]}
                 >
-                    <Text style={styles.sectionTitle}>Spending by Category</Text>
+                    <View style={styles.sectionHeader}>
+                        <Text style={styles.sectionTitle}>Spending by Category</Text>
+                        <Text style={styles.sectionSubtitle}>Top categories</Text>
+                    </View>
                     <View style={styles.categoriesList}>
                         {analytics.topCategories.map((item, index) => (
                             <CategoryProgress
@@ -380,7 +464,7 @@ const Analytics = () => {
                                 category={item.category}
                                 amount={item.amount}
                                 percentage={item.percentage}
-                                color={item.color}
+                                gradient={item.gradient}
                             />
                         ))}
                     </View>
@@ -399,49 +483,37 @@ const Analytics = () => {
             >
                 <Text style={styles.sectionTitle}>Spending Insights</Text>
                 <View style={styles.insightsGrid}>
-                    <View style={styles.insightCard}>
-                        <Ionicons name="trending-up" size={24} color="#10B981" />
-                        <Text style={styles.insightTitle}>Highest Category</Text>
-                        <Text style={styles.insightValue}>
-                            {analytics.topCategories[0]?.category ? analytics.topCategories[0].category.charAt(0).toUpperCase() + analytics.topCategories[0].category.slice(1) : 'N/A'}
-                        </Text>
-                        <Text style={styles.insightSubtitle}>
-                            ${analytics.topCategories[0]?.amount.toFixed(2) || '0'}
-                        </Text>
-                    </View>
+                    <InsightCard
+                        title="Highest Category"
+                        value={analytics.topCategories[0]?.category ? analytics.topCategories[0].category.charAt(0).toUpperCase() + analytics.topCategories[0].category.slice(1) : 'N/A'}
+                        subtitle={`$${analytics.topCategories[0]?.amount.toFixed(0) || '0'}`}
+                        icon="trending-up"
+                        gradient={['#10B981', '#34D399']}
+                    />
 
-                    <View style={styles.insightCard}>
-                        <Ionicons name="calendar" size={24} color="#6366F1" />
-                        <Text style={styles.insightTitle}>Bills Status</Text>
-                        <Text style={styles.insightValue}>
-                            {analytics.paidBills}/{analytics.paidBills + analytics.pendingBills}
-                        </Text>
-                        <Text style={styles.insightSubtitle}>
-                            Paid bills
-                        </Text>
-                    </View>
+                    <InsightCard
+                        title="Bills Status"
+                        value={`${analytics.paidBills}/${analytics.paidBills + analytics.pendingBills}`}
+                        subtitle="Paid bills"
+                        icon="checkmark-circle"
+                        gradient={['#6366F1', '#8B5CF6']}
+                    />
 
-                    <View style={styles.insightCard}>
-                        <Ionicons name="cash" size={24} color="#F59E0B" />
-                        <Text style={styles.insightTitle}>Monthly Avg</Text>
-                        <Text style={styles.insightValue}>
-                            ${analytics.averageBill.toFixed(2)}
-                        </Text>
-                        <Text style={styles.insightSubtitle}>
-                            Per bill
-                        </Text>
-                    </View>
+                    <InsightCard
+                        title="Monthly Avg"
+                        value={`$${analytics.averageBill.toFixed(0)}`}
+                        subtitle="Per bill"
+                        icon="cash"
+                        gradient={['#F59E0B', '#FBBF24']}
+                    />
 
-                    <View style={styles.insightCard}>
-                        <Ionicons name="repeat" size={24} color="#EC4899" />
-                        <Text style={styles.insightTitle}>Recurring</Text>
-                        <Text style={styles.insightValue}>
-                            {analytics.recurringBills}
-                        </Text>
-                        <Text style={styles.insightSubtitle}>
-                            Auto-pay bills
-                        </Text>
-                    </View>
+                    <InsightCard
+                        title="Recurring"
+                        value={analytics.recurringBills.toString()}
+                        subtitle="Auto-pay bills"
+                        icon="repeat"
+                        gradient={['#EC4899', '#F472B6']}
+                    />
                 </View>
             </Animated.View>
 
@@ -467,58 +539,71 @@ const Analytics = () => {
     );
 };
 
-// Add TouchableOpacity component
-const TouchableOpacity = ({ style, onPress, children }) => (
-    <View style={style} onStartShouldSetResponder={() => true} onResponderRelease={onPress}>
-        {children}
-    </View>
-);
-
 const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: '#f8fafc',
     },
+    scrollContent: {
+        paddingBottom: 40,
+    },
     header: {
-        padding: 20,
-        paddingBottom: 10,
+        padding: 24,
+        paddingTop: 60,
+        paddingBottom: 16,
     },
     title: {
         fontSize: 32,
-        fontWeight: '700',
+        fontWeight: '800',
         color: '#1F2937',
+        letterSpacing: -0.5,
         marginBottom: 4,
     },
     subtitle: {
         fontSize: 16,
         color: '#6B7280',
-        marginBottom: 16,
+        fontWeight: '500',
+        marginBottom: 20,
     },
     timeRangeContainer: {
         flexDirection: 'row',
         backgroundColor: '#fff',
-        borderRadius: 12,
-        padding: 4,
-        marginTop: 8,
+        borderRadius: 16,
+        padding: 6,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 12,
+        elevation: 4,
     },
     timeRangeButton: {
         flex: 1,
-        paddingVertical: 8,
-        paddingHorizontal: 12,
-        borderRadius: 8,
-        alignItems: 'center',
+        borderRadius: 12,
+        overflow: 'hidden',
     },
     timeRangeButtonActive: {
-        backgroundColor: '#6366F1',
+        shadowColor: '#6366F1',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 6,
+    },
+    timeRangeGradient: {
+        paddingVertical: 10,
+        paddingHorizontal: 12,
+        borderRadius: 12,
+        alignItems: 'center',
+        flexDirection: 'row',
+        justifyContent: 'center',
+        gap: 6,
     },
     timeRangeText: {
-        fontSize: 14,
-        fontWeight: '500',
+        fontSize: 13,
+        fontWeight: '600',
         color: '#6B7280',
     },
     timeRangeTextActive: {
         color: '#fff',
-        fontWeight: '600',
     },
     statsGrid: {
         flexDirection: 'row',
@@ -529,106 +614,120 @@ const styles = StyleSheet.create({
     statCard: {
         flex: 1,
         minWidth: '47%',
-        backgroundColor: '#fff',
-        padding: 16,
-        borderRadius: 16,
+        borderRadius: 20,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 12,
-        elevation: 4,
-        flexDirection: 'row',
-        alignItems: 'center',
+        shadowOffset: { width: 0, height: 12 },
+        shadowOpacity: 0.2,
+        shadowRadius: 20,
+        elevation: 8,
+        overflow: 'hidden',
     },
-    statIcon: {
-        width: 40,
-        height: 40,
-        borderRadius: 10,
+    statGradient: {
+        padding: 20,
+        borderRadius: 20,
+    },
+    statHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    statIconContainer: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
         justifyContent: 'center',
         alignItems: 'center',
-        marginRight: 12,
+        backgroundColor: 'rgba(255,255,255,0.2)',
     },
-    statContent: {
-        flex: 1,
+    statTrend: {
+        opacity: 0.8,
     },
     statValue: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: '#1F2937',
-        marginBottom: 2,
+        fontSize: 22,
+        fontWeight: '800',
+        color: '#fff',
+        marginBottom: 4,
     },
     statTitle: {
-        fontSize: 12,
-        fontWeight: '600',
-        color: '#374151',
+        fontSize: 14,
+        fontWeight: '700',
+        color: 'rgba(255,255,255,0.9)',
         marginBottom: 2,
     },
     statSubtitle: {
-        fontSize: 10,
-        color: '#6B7280',
+        fontSize: 12,
+        color: 'rgba(255,255,255,0.7)',
     },
     chartSection: {
         backgroundColor: '#fff',
         margin: 16,
-        padding: 20,
-        borderRadius: 16,
+        padding: 24,
+        borderRadius: 24,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
+        shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.1,
-        shadowRadius: 12,
-        elevation: 4,
+        shadowRadius: 20,
+        elevation: 8,
+    },
+    sectionHeader: {
+        marginBottom: 20,
     },
     sectionTitle: {
-        fontSize: 18,
-        fontWeight: '700',
+        fontSize: 22,
+        fontWeight: '800',
         color: '#1F2937',
-        marginBottom: 16,
+        letterSpacing: -0.5,
     },
-    // Custom Bar Chart Styles
+    sectionSubtitle: {
+        fontSize: 14,
+        color: '#6B7280',
+        fontWeight: '500',
+        marginTop: 4,
+    },
     barChartContainer: {
         marginTop: 8,
     },
     barChartItem: {
-        marginBottom: 16,
+        marginBottom: 20,
     },
     barLabelContainer: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 8,
+        marginBottom: 12,
     },
     barLabel: {
         fontSize: 14,
-        fontWeight: '500',
+        fontWeight: '600',
         color: '#374151',
     },
     barValue: {
         fontSize: 14,
-        fontWeight: '600',
+        fontWeight: '700',
         color: '#6366F1',
     },
     barBackground: {
-        height: 8,
+        height: 10,
         backgroundColor: '#F3F4F6',
-        borderRadius: 4,
+        borderRadius: 5,
         overflow: 'hidden',
     },
     barFill: {
         height: '100%',
-        borderRadius: 4,
+        borderRadius: 5,
     },
-    // Category Progress Styles
     categoriesList: {
         marginTop: 8,
     },
     categoryProgressItem: {
-        marginBottom: 16,
+        marginBottom: 20,
     },
     categoryProgressHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 8,
+        marginBottom: 12,
     },
     categoryInfo: {
         flexDirection: 'row',
@@ -636,14 +735,19 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     categoryColor: {
-        width: 12,
-        height: 12,
-        borderRadius: 6,
+        width: 16,
+        height: 16,
+        borderRadius: 8,
         marginRight: 12,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
+        elevation: 3,
     },
     categoryName: {
-        fontSize: 14,
-        fontWeight: '500',
+        fontSize: 15,
+        fontWeight: '600',
         color: '#374151',
         textTransform: 'capitalize',
     },
@@ -651,24 +755,25 @@ const styles = StyleSheet.create({
         alignItems: 'flex-end',
     },
     categoryValue: {
-        fontSize: 14,
-        fontWeight: '600',
+        fontSize: 15,
+        fontWeight: '700',
         color: '#1F2937',
         marginBottom: 2,
     },
     categoryPercentage: {
-        fontSize: 12,
+        fontSize: 13,
         color: '#6B7280',
+        fontWeight: '500',
     },
     progressBarBackground: {
-        height: 6,
+        height: 8,
         backgroundColor: '#F3F4F6',
-        borderRadius: 3,
+        borderRadius: 4,
         overflow: 'hidden',
     },
     progressBarFill: {
         height: '100%',
-        borderRadius: 3,
+        borderRadius: 4,
     },
     insightsSection: {
         padding: 16,
@@ -681,46 +786,47 @@ const styles = StyleSheet.create({
     insightCard: {
         flex: 1,
         minWidth: '47%',
-        backgroundColor: '#fff',
-        padding: 16,
-        borderRadius: 16,
+        borderRadius: 20,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 8,
-        elevation: 3,
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.2,
+        shadowRadius: 16,
+        elevation: 6,
+        overflow: 'hidden',
+    },
+    insightGradient: {
+        padding: 20,
+        borderRadius: 20,
         alignItems: 'center',
     },
-    insightTitle: {
-        fontSize: 12,
-        fontWeight: '600',
-        color: '#6B7280',
-        marginTop: 8,
+    insightValue: {
+        fontSize: 18,
+        fontWeight: '800',
+        color: '#fff',
+        marginTop: 12,
         marginBottom: 4,
         textAlign: 'center',
     },
-    insightValue: {
-        fontSize: 16,
-        fontWeight: '700',
-        color: '#1F2937',
+    insightTitle: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: 'rgba(255,255,255,0.9)',
         marginBottom: 2,
         textAlign: 'center',
     },
     insightSubtitle: {
-        fontSize: 11,
-        color: '#9CA3AF',
+        fontSize: 12,
+        color: 'rgba(255,255,255,0.7)',
         textAlign: 'center',
     },
     emptyState: {
-        flex: 1,
-        justifyContent: 'center',
         alignItems: 'center',
         padding: 40,
         marginTop: 20,
     },
     emptyTitle: {
         fontSize: 20,
-        fontWeight: '600',
+        fontWeight: '700',
         color: '#374151',
         marginTop: 16,
         marginBottom: 8,
@@ -741,6 +847,7 @@ const styles = StyleSheet.create({
         marginTop: 16,
         fontSize: 16,
         color: '#6B7280',
+        fontWeight: '500',
     },
 });
 

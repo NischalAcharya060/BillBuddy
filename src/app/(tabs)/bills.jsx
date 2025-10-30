@@ -1,11 +1,14 @@
 // src/app/(tabs)/bills.jsx
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Animated, ScrollView, Alert, RefreshControl, Modal, ActivityIndicator } from "react-native";
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Animated, ScrollView, Alert, RefreshControl, Modal, ActivityIndicator, Dimensions } from "react-native";
 import React, { useState, useRef, useEffect } from "react";
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from "../../contexts/AuthContext";
 import { db } from "../../firebase/config";
 import { collection, query, where, onSnapshot, orderBy, updateDoc, doc, deleteDoc } from "firebase/firestore";
 import { useRouter } from "expo-router";
+
+const { width } = Dimensions.get('window');
 
 const Bills = () => {
     const { user } = useAuth();
@@ -17,37 +20,38 @@ const Bills = () => {
     const [sortBy, setSortBy] = useState('dueDate');
     const [editModalVisible, setEditModalVisible] = useState(false);
     const [selectedBill, setSelectedBill] = useState(null);
+
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(30)).current;
+    const scaleAnim = useRef(new Animated.Value(0.95)).current;
 
     const categories = {
-        electricity: { name: 'Electricity', icon: 'flash', color: '#F59E0B' },
-        rent: { name: 'Rent', icon: 'home', color: '#6366F1' },
-        wifi: { name: 'Wi-Fi', icon: 'wifi', color: '#10B981' },
-        subscriptions: { name: 'Subscriptions', icon: 'play', color: '#EC4899' },
-        water: { name: 'Water', icon: 'water', color: '#06B6D4' },
-        gas: { name: 'Gas', icon: 'flame', color: '#EF4444' },
-        phone: { name: 'Phone', icon: 'call', color: '#8B5CF6' },
-        other: { name: 'Other', icon: 'ellipsis-horizontal', color: '#6B7280' },
+        electricity: { name: 'Electricity', icon: 'flash', color: '#F59E0B', gradient: ['#F59E0B', '#D97706'] },
+        rent: { name: 'Rent', icon: 'home', color: '#6366F1', gradient: ['#6366F1', '#8B5CF6'] },
+        wifi: { name: 'Wi-Fi', icon: 'wifi', color: '#10B981', gradient: ['#10B981', '#059669'] },
+        subscriptions: { name: 'Subscriptions', icon: 'play', color: '#EC4899', gradient: ['#EC4899', '#DB2777'] },
+        water: { name: 'Water', icon: 'water', color: '#06B6D4', gradient: ['#06B6D4', '#0891B2'] },
+        gas: { name: 'Gas', icon: 'flame', color: '#EF4444', gradient: ['#EF4444', '#DC2626'] },
+        phone: { name: 'Phone', icon: 'call', color: '#8B5CF6', gradient: ['#8B5CF6', '#7C3AED'] },
+        other: { name: 'Other', icon: 'ellipsis-horizontal', color: '#6B7280', gradient: ['#6B7280', '#4B5563'] },
     };
 
     const filters = [
-        { id: 'all', name: 'All Bills' },
-        { id: 'pending', name: 'Pending' },
-        { id: 'paid', name: 'Paid' },
-        { id: 'overdue', name: 'Overdue' },
+        { id: 'all', name: 'All', icon: 'list' },
+        { id: 'pending', name: 'Pending', icon: 'time' },
+        { id: 'paid', name: 'Paid', icon: 'checkmark' },
+        { id: 'overdue', name: 'Overdue', icon: 'warning' },
     ];
 
     const sortOptions = [
-        { id: 'dueDate', name: 'Due Date' },
-        { id: 'amount', name: 'Amount' },
-        { id: 'name', name: 'Name' },
+        { id: 'dueDate', name: 'Due Date', icon: 'calendar' },
+        { id: 'amount', name: 'Amount', icon: 'cash' },
+        { id: 'name', name: 'Name', icon: 'text' },
     ];
 
     useEffect(() => {
         if (!user) return;
 
-        // Set up real-time listener
         const billsQuery = query(
             collection(db, 'bills'),
             where('userId', '==', user.uid),
@@ -67,7 +71,6 @@ const Bills = () => {
                     });
                 });
 
-                // Calculate status for each bill
                 const billsWithStatus = billsData.map(bill => {
                     const status = calculateBillStatus(bill);
                     return {
@@ -81,16 +84,21 @@ const Bills = () => {
                 setLoading(false);
                 setRefreshing(false);
 
-                // Start animations after data loads
                 Animated.parallel([
                     Animated.timing(fadeAnim, {
                         toValue: 1,
-                        duration: 600,
+                        duration: 800,
                         useNativeDriver: true,
                     }),
                     Animated.timing(slideAnim, {
                         toValue: 0,
-                        duration: 600,
+                        duration: 800,
+                        useNativeDriver: true,
+                    }),
+                    Animated.spring(scaleAnim, {
+                        toValue: 1,
+                        tension: 20,
+                        friction: 7,
                         useNativeDriver: true,
                     })
                 ]).start();
@@ -103,7 +111,6 @@ const Bills = () => {
             }
         );
 
-        // Cleanup subscription on unmount
         return () => unsubscribe();
     }, [user]);
 
@@ -114,13 +121,8 @@ const Bills = () => {
         const dueDate = new Date(bill.dueTimestamp);
         dueDate.setHours(0, 0, 0, 0);
 
-        // If bill is marked as paid in Firestore
         if (bill.status === 'paid') return 'paid';
-
-        // If due date is in the past and not paid
         if (dueDate < today) return 'overdue';
-
-        // Otherwise pending
         return 'pending';
     };
 
@@ -146,15 +148,12 @@ const Bills = () => {
 
             const newStatus = bill.status === 'paid' ? 'pending' : 'paid';
 
-            // Update in Firestore
             const billRef = doc(db, 'bills', billId);
             await updateDoc(billRef, {
                 status: newStatus,
                 updatedAt: new Date(),
                 paidAt: newStatus === 'paid' ? new Date() : null
             });
-
-            // Local state will update automatically via the snapshot listener
         } catch (error) {
             console.error('Error updating bill status:', error);
             Alert.alert('Error', 'Failed to update bill status. Please try again.');
@@ -163,13 +162,9 @@ const Bills = () => {
 
     const handleEditBill = (bill) => {
         setEditModalVisible(false);
-
-        // Navigate to the dedicated edit screen
         router.push({
             pathname: '/(tabs)/edit-bill',
-            params: {
-                billId: bill.id
-            }
+            params: { billId: bill.id }
         });
     };
 
@@ -178,15 +173,8 @@ const Bills = () => {
             "Delete Bill",
             `Are you sure you want to delete "${bill.name}"?`,
             [
-                {
-                    text: "Cancel",
-                    style: "cancel"
-                },
-                {
-                    text: "Delete",
-                    style: "destructive",
-                    onPress: () => deleteBill(bill.id)
-                }
+                { text: "Cancel", style: "cancel" },
+                { text: "Delete", style: "destructive", onPress: () => deleteBill(bill.id) }
             ]
         );
     };
@@ -195,7 +183,6 @@ const Bills = () => {
         try {
             const billRef = doc(db, 'bills', billId);
             await deleteDoc(billRef);
-            // Success handled by real-time listener
         } catch (error) {
             console.error('Error deleting bill:', error);
             Alert.alert('Error', 'Failed to delete bill. Please try again.');
@@ -213,6 +200,15 @@ const Bills = () => {
             case 'overdue': return '#EF4444';
             case 'pending': return '#F59E0B';
             default: return '#6B7280';
+        }
+    };
+
+    const getStatusGradient = (status) => {
+        switch (status) {
+            case 'paid': return ['#10B981', '#059669'];
+            case 'overdue': return ['#EF4444', '#DC2626'];
+            case 'pending': return ['#F59E0B', '#D97706'];
+            default: return ['#6B7280', '#4B5563'];
         }
     };
 
@@ -249,7 +245,7 @@ const Bills = () => {
         setRefreshing(true);
     };
 
-    const BillCard = ({ item }) => {
+    const BillCard = ({ item, index }) => {
         const category = categories[item.category] || categories.other;
         const daysUntilDue = getDaysUntilDue(item.dueTimestamp || item.dueDate);
         const isOverdue = daysUntilDue < 0 && item.status !== 'paid';
@@ -260,15 +256,23 @@ const Bills = () => {
                     styles.billCard,
                     {
                         opacity: fadeAnim,
-                        transform: [{ translateY: slideAnim }]
+                        transform: [
+                            { translateY: slideAnim },
+                            { scale: scaleAnim }
+                        ]
                     }
                 ]}
             >
                 <View style={styles.billHeader}>
                     <View style={styles.billInfo}>
-                        <View style={[styles.categoryIcon, { backgroundColor: category.color }]}>
-                            <Ionicons name={category.icon} size={16} color="#fff" />
-                        </View>
+                        <LinearGradient
+                            colors={category.gradient}
+                            style={styles.categoryIcon}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                        >
+                            <Ionicons name={category.icon} size={18} color="#fff" />
+                        </LinearGradient>
                         <View style={styles.billDetails}>
                             <Text style={styles.billName}>{item.name}</Text>
                             <Text style={styles.billCategory}>{category.name}</Text>
@@ -289,21 +293,21 @@ const Bills = () => {
                     </View>
 
                     <View style={styles.actions}>
-                        <View style={[
-                            styles.statusBadge,
-                            { backgroundColor: `${getStatusColor(item.status)}20` }
-                        ]}>
-                            <View style={[
-                                styles.statusDot,
-                                { backgroundColor: getStatusColor(item.status) }
-                            ]} />
-                            <Text style={[
-                                styles.statusText,
-                                { color: getStatusColor(item.status) }
-                            ]}>
+                        <LinearGradient
+                            colors={getStatusGradient(item.status)}
+                            style={styles.statusBadge}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                        >
+                            <Ionicons
+                                name={item.status === 'paid' ? 'checkmark' : item.status === 'overdue' ? 'warning' : 'time'}
+                                size={12}
+                                color="#fff"
+                            />
+                            <Text style={styles.statusText}>
                                 {getStatusText(item.status)}
                             </Text>
-                        </View>
+                        </LinearGradient>
 
                         <View style={styles.actionButtons}>
                             <TouchableOpacity
@@ -315,7 +319,7 @@ const Bills = () => {
                             >
                                 <Ionicons
                                     name={item.status === 'paid' ? "checkmark-circle" : "ellipsis-horizontal"}
-                                    size={20}
+                                    size={22}
                                     color={item.status === 'paid' ? "#10B981" : "#6B7280"}
                                 />
                             </TouchableOpacity>
@@ -326,7 +330,7 @@ const Bills = () => {
                             >
                                 <Ionicons
                                     name="ellipsis-vertical"
-                                    size={16}
+                                    size={18}
                                     color="#6B7280"
                                 />
                             </TouchableOpacity>
@@ -335,10 +339,15 @@ const Bills = () => {
                 </View>
 
                 {item.isRecurring && (
-                    <View style={styles.recurringBadge}>
-                        <Ionicons name="repeat" size={12} color="#6366F1" />
+                    <LinearGradient
+                        colors={['#6366F1', '#8B5CF6']}
+                        style={styles.recurringBadge}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                    >
+                        <Ionicons name="repeat" size={10} color="#fff" />
                         <Text style={styles.recurringText}>Recurring</Text>
-                    </View>
+                    </LinearGradient>
                 )}
             </Animated.View>
         );
@@ -349,10 +358,16 @@ const Bills = () => {
         const paidBills = bills.filter(bill => bill.status === 'paid').length;
         const pendingBills = bills.filter(bill => bill.status === 'pending').length;
         const overdueBills = bills.filter(bill => bill.status === 'overdue').length;
-        const totalAmount = bills.reduce((sum, bill) => sum + bill.amount, 0);
         const pendingAmount = bills
             .filter(bill => bill.status !== 'paid')
             .reduce((sum, bill) => sum + bill.amount, 0);
+
+        const stats = [
+            { value: totalBills, label: 'Total', color: '#6366F1', icon: 'documents' },
+            { value: paidBills, label: 'Paid', color: '#10B981', icon: 'checkmark-circle' },
+            { value: pendingBills, label: 'Pending', color: '#F59E0B', icon: 'time' },
+            { value: `$${pendingAmount.toFixed(0)}`, label: 'Due', color: '#EC4899', icon: 'cash' },
+        ];
 
         return (
             <Animated.View
@@ -364,30 +379,21 @@ const Bills = () => {
                     }
                 ]}
             >
-                <View style={styles.statItem}>
-                    <Text style={styles.statValue}>{totalBills}</Text>
-                    <Text style={styles.statLabel}>Total Bills</Text>
-                </View>
-                <View style={styles.statDivider} />
-                <View style={styles.statItem}>
-                    <Text style={[styles.statValue, { color: '#10B981' }]}>{paidBills}</Text>
-                    <Text style={styles.statLabel}>Paid</Text>
-                </View>
-                <View style={styles.statDivider} />
-                <View style={styles.statItem}>
-                    <Text style={[styles.statValue, { color: '#F59E0B' }]}>{pendingBills}</Text>
-                    <Text style={styles.statLabel}>Pending</Text>
-                </View>
-                <View style={styles.statDivider} />
-                <View style={styles.statItem}>
-                    <Text style={[styles.statValue, { color: '#6366F1' }]}>${pendingAmount.toFixed(0)}</Text>
-                    <Text style={styles.statLabel}>Due</Text>
-                </View>
+                {stats.map((stat, index) => (
+                    <View key={stat.label} style={styles.statItem}>
+                        <View style={[styles.statIconContainer, { backgroundColor: `${stat.color}20` }]}>
+                            <Ionicons name={stat.icon} size={16} color={stat.color} />
+                        </View>
+                        <Text style={[styles.statValue, { color: stat.color }]}>
+                            {stat.value}
+                        </Text>
+                        <Text style={styles.statLabel}>{stat.label}</Text>
+                    </View>
+                ))}
             </Animated.View>
         );
     };
 
-    // Edit Options Modal
     const EditOptionsModal = () => (
         <Modal
             animationType="slide"
@@ -409,9 +415,14 @@ const Bills = () => {
 
                     {selectedBill && (
                         <View style={styles.billPreview}>
-                            <View style={[styles.categoryIcon, { backgroundColor: categories[selectedBill.category]?.color || '#6B7280' }]}>
-                                <Ionicons name={categories[selectedBill.category]?.icon || 'ellipsis-horizontal'} size={16} color="#fff" />
-                            </View>
+                            <LinearGradient
+                                colors={categories[selectedBill.category]?.gradient || categories.other.gradient}
+                                style={styles.categoryIcon}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
+                            >
+                                <Ionicons name={categories[selectedBill.category]?.icon || 'ellipsis-horizontal'} size={18} color="#fff" />
+                            </LinearGradient>
                             <View style={styles.billPreviewInfo}>
                                 <Text style={styles.billPreviewName}>{selectedBill.name}</Text>
                                 <Text style={styles.billPreviewAmount}>${selectedBill.amount.toFixed(2)}</Text>
@@ -427,8 +438,15 @@ const Bills = () => {
                             style={[styles.modalButton, styles.editButtonModal]}
                             onPress={() => handleEditBill(selectedBill)}
                         >
-                            <Ionicons name="create-outline" size={20} color="#6366F1" />
-                            <Text style={[styles.modalButtonText, { color: '#6366F1' }]}>Edit Bill</Text>
+                            <LinearGradient
+                                colors={['#6366F1', '#8B5CF6']}
+                                style={styles.modalButtonIcon}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
+                            >
+                                <Ionicons name="create-outline" size={20} color="#fff" />
+                            </LinearGradient>
+                            <Text style={styles.modalButtonText}>Edit Bill</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity
@@ -438,8 +456,15 @@ const Bills = () => {
                                 handleDeleteBill(selectedBill);
                             }}
                         >
-                            <Ionicons name="trash-outline" size={20} color="#EF4444" />
-                            <Text style={[styles.modalButtonText, { color: '#EF4444' }]}>Delete Bill</Text>
+                            <LinearGradient
+                                colors={['#EF4444', '#DC2626']}
+                                style={styles.modalButtonIcon}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
+                            >
+                                <Ionicons name="trash-outline" size={20} color="#fff" />
+                            </LinearGradient>
+                            <Text style={styles.modalButtonText}>Delete Bill</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -453,11 +478,11 @@ const Bills = () => {
                 <View style={styles.header}>
                     <View>
                         <Text style={styles.title}>My Bills</Text>
-                        <Text style={styles.subtitle}>Manage and track your expenses</Text>
+                        <Text style={styles.subtitle}>Manage your expenses</Text>
                     </View>
                 </View>
                 <View style={styles.loadingContainer}>
-                    <Ionicons name="refresh" size={32} color="#6366F1" />
+                    <ActivityIndicator size="large" color="#6366F1" />
                     <Text style={styles.loadingText}>Loading your bills...</Text>
                 </View>
             </View>
@@ -478,10 +503,18 @@ const Bills = () => {
             >
                 <View>
                     <Text style={styles.title}>My Bills</Text>
-                    <Text style={styles.subtitle}>Manage and track your expenses</Text>
+                    <Text style={styles.subtitle}>Manage your expenses</Text>
                 </View>
-                <TouchableOpacity style={styles.filterButton}>
-                    <Ionicons name="options-outline" size={24} color="#6366F1" />
+                <TouchableOpacity
+                    style={styles.filterButton}
+                    onPress={() => {
+                        const sortOrder = ['dueDate', 'amount', 'name'];
+                        const currentIndex = sortOrder.indexOf(sortBy);
+                        const nextIndex = (currentIndex + 1) % sortOrder.length;
+                        setSortBy(sortOrder[nextIndex]);
+                    }}
+                >
+                    <Ionicons name="filter" size={24} color="#6366F1" />
                 </TouchableOpacity>
             </Animated.View>
 
@@ -512,6 +545,11 @@ const Bills = () => {
                             ]}
                             onPress={() => setFilter(filterItem.id)}
                         >
+                            <Ionicons
+                                name={filterItem.icon}
+                                size={16}
+                                color={filter === filterItem.id ? '#fff' : '#6B7280'}
+                            />
                             <Text style={[
                                 styles.filterText,
                                 filter === filterItem.id && styles.filterTextActive
@@ -522,18 +560,12 @@ const Bills = () => {
                     ))}
                 </ScrollView>
 
-                <TouchableOpacity
-                    style={styles.sortButton}
-                    onPress={() => {
-                        // Simple sort toggle - can be enhanced with modal
-                        setSortBy(sortBy === 'dueDate' ? 'amount' : 'dueDate');
-                    }}
-                >
-                    <Ionicons name="swap-vertical" size={16} color="#6366F1" />
+                <View style={styles.sortInfo}>
+                    <Ionicons name={sortOptions.find(opt => opt.id === sortBy)?.icon || 'swap-vertical'} size={14} color="#6366F1" />
                     <Text style={styles.sortText}>
-                        Sort: {sortOptions.find(opt => opt.id === sortBy)?.name}
+                        {sortOptions.find(opt => opt.id === sortBy)?.name}
                     </Text>
-                </TouchableOpacity>
+                </View>
             </Animated.View>
 
             {/* Bills List */}
@@ -557,12 +589,20 @@ const Bills = () => {
                             : `No ${filter} bills at the moment.`
                         }
                     </Text>
+                    {bills.length === 0 && (
+                        <TouchableOpacity
+                            style={styles.addFirstBillButton}
+                            onPress={() => router.push('/(tabs)/add')}
+                        >
+                            <Text style={styles.addFirstBillText}>Add Your First Bill</Text>
+                        </TouchableOpacity>
+                    )}
                 </Animated.View>
             ) : (
                 <FlatList
                     data={filteredAndSortedBills}
                     keyExtractor={(item) => item.id}
-                    renderItem={({ item }) => <BillCard item={item} />}
+                    renderItem={({ item, index }) => <BillCard item={item} index={index} />}
                     contentContainerStyle={styles.listContent}
                     showsVerticalScrollIndicator={false}
                     refreshControl={
@@ -591,148 +631,172 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        padding: 20,
-        paddingBottom: 10,
+        padding: 24,
+        paddingTop: 60,
+        paddingBottom: 16,
     },
     title: {
         fontSize: 32,
-        fontWeight: '700',
+        fontWeight: '800',
         color: '#1F2937',
-        marginBottom: 4,
+        letterSpacing: -0.5,
     },
     subtitle: {
         fontSize: 16,
         color: '#6B7280',
+        fontWeight: '500',
     },
     filterButton: {
-        padding: 8,
+        padding: 12,
+        backgroundColor: 'rgba(99, 102, 241, 0.1)',
+        borderRadius: 12,
     },
     statsContainer: {
         flexDirection: 'row',
         backgroundColor: '#fff',
         margin: 20,
-        marginVertical: 10,
+        marginVertical: 8,
         padding: 20,
-        borderRadius: 16,
+        borderRadius: 24,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
+        shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.1,
-        shadowRadius: 12,
-        elevation: 4,
+        shadowRadius: 20,
+        elevation: 8,
     },
     statItem: {
         flex: 1,
         alignItems: 'center',
     },
+    statIconContainer: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
     statValue: {
-        fontSize: 20,
-        fontWeight: '700',
-        color: '#1F2937',
+        fontSize: 18,
+        fontWeight: '800',
         marginBottom: 4,
     },
     statLabel: {
         fontSize: 12,
         color: '#6B7280',
-        fontWeight: '500',
-    },
-    statDivider: {
-        width: 1,
-        backgroundColor: '#F3F4F6',
+        fontWeight: '600',
     },
     filtersContainer: {
         paddingHorizontal: 20,
-        marginBottom: 10,
+        marginBottom: 8,
     },
     filtersScroll: {
         paddingRight: 20,
     },
     filterChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
         paddingHorizontal: 16,
-        paddingVertical: 8,
+        paddingVertical: 10,
         backgroundColor: '#fff',
         borderRadius: 20,
         borderWidth: 1,
         borderColor: '#E5E7EB',
         marginRight: 8,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+        elevation: 2,
     },
     filterChipActive: {
         backgroundColor: '#6366F1',
         borderColor: '#6366F1',
+        shadowColor: '#6366F1',
+        shadowOpacity: 0.2,
     },
     filterText: {
         fontSize: 14,
-        fontWeight: '500',
+        fontWeight: '600',
         color: '#6B7280',
+        marginLeft: 6,
     },
     filterTextActive: {
         color: '#fff',
     },
-    sortButton: {
+    sortInfo: {
         flexDirection: 'row',
         alignItems: 'center',
         alignSelf: 'flex-start',
         marginTop: 12,
         paddingHorizontal: 12,
-        paddingVertical: 6,
+        paddingVertical: 8,
         backgroundColor: 'rgba(99, 102, 241, 0.1)',
         borderRadius: 12,
     },
     sortText: {
         fontSize: 12,
-        fontWeight: '600',
+        fontWeight: '700',
         color: '#6366F1',
         marginLeft: 4,
     },
     listContent: {
         padding: 20,
-        paddingTop: 10,
+        paddingTop: 8,
     },
     billCard: {
         backgroundColor: '#fff',
-        padding: 16,
-        borderRadius: 16,
+        padding: 20,
+        borderRadius: 20,
         marginBottom: 12,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
+        shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.1,
-        shadowRadius: 8,
-        elevation: 3,
+        shadowRadius: 16,
+        elevation: 4,
+        position: 'relative',
     },
     billHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'flex-start',
-        marginBottom: 12,
+        marginBottom: 16,
     },
     billInfo: {
         flexDirection: 'row',
         alignItems: 'center',
         flex: 1,
     },
-    billDetails: {
-        flex: 1,
-    },
     categoryIcon: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
+        width: 44,
+        height: 44,
+        borderRadius: 14,
         justifyContent: 'center',
         alignItems: 'center',
         marginRight: 12,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+        elevation: 4,
+    },
+    billDetails: {
+        flex: 1,
     },
     billName: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#1F2937',
-        marginBottom: 2,
-    },
-    billCategory: {
-        fontSize: 12,
-        color: '#6B7280',
-    },
-    billAmount: {
         fontSize: 18,
         fontWeight: '700',
+        color: '#1F2937',
+        marginBottom: 4,
+    },
+    billCategory: {
+        fontSize: 14,
+        color: '#6B7280',
+        fontWeight: '500',
+    },
+    billAmount: {
+        fontSize: 20,
+        fontWeight: '800',
         color: '#1F2937',
     },
     billFooter: {
@@ -746,8 +810,9 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     dueDate: {
-        fontSize: 12,
+        fontSize: 14,
         color: '#6B7280',
+        fontWeight: '500',
         marginLeft: 6,
     },
     overdueDate: {
@@ -757,34 +822,33 @@ const styles = StyleSheet.create({
     actions: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
-        flex: 1,
     },
     actionButtons: {
         flexDirection: 'row',
         alignItems: 'center',
+        marginLeft: 12,
     },
     statusBadge: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 8,
-        paddingVertical: 4,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
         borderRadius: 12,
-        marginRight: 8,
-    },
-    statusDot: {
-        width: 6,
-        height: 6,
-        borderRadius: 3,
-        marginRight: 4,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 2,
     },
     statusText: {
-        fontSize: 10,
-        fontWeight: '600',
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#fff',
+        marginLeft: 4,
     },
     payButton: {
-        padding: 6,
-        borderRadius: 8,
+        padding: 8,
+        borderRadius: 10,
         backgroundColor: '#F8FAFC',
         marginRight: 8,
     },
@@ -792,28 +856,30 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(16, 185, 129, 0.1)',
     },
     editButton: {
-        padding: 6,
-        borderRadius: 8,
+        padding: 8,
+        borderRadius: 10,
         backgroundColor: '#F8FAFC',
     },
     recurringBadge: {
         position: 'absolute',
         top: -6,
-        right: 16,
+        right: 20,
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#fff',
-        paddingHorizontal: 8,
-        paddingVertical: 2,
-        borderRadius: 10,
-        borderWidth: 1,
-        borderColor: '#E5E7EB',
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 12,
+        shadowColor: '#6366F1',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 4,
     },
     recurringText: {
         fontSize: 10,
-        color: '#6366F1',
-        fontWeight: '600',
-        marginLeft: 2,
+        color: '#fff',
+        fontWeight: '700',
+        marginLeft: 4,
     },
     emptyState: {
         flex: 1,
@@ -823,7 +889,7 @@ const styles = StyleSheet.create({
     },
     emptyTitle: {
         fontSize: 20,
-        fontWeight: '600',
+        fontWeight: '700',
         color: '#374151',
         marginTop: 16,
         marginBottom: 8,
@@ -834,6 +900,23 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         lineHeight: 22,
     },
+    addFirstBillButton: {
+        marginTop: 20,
+        backgroundColor: '#6366F1',
+        paddingHorizontal: 24,
+        paddingVertical: 14,
+        borderRadius: 16,
+        shadowColor: '#6366F1',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.3,
+        shadowRadius: 16,
+        elevation: 6,
+    },
+    addFirstBillText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: '700',
+    },
     loadingContainer: {
         flex: 1,
         justifyContent: 'center',
@@ -843,6 +926,7 @@ const styles = StyleSheet.create({
         marginTop: 12,
         fontSize: 16,
         color: '#6B7280',
+        fontWeight: '500',
     },
     // Modal Styles
     modalOverlay: {
@@ -852,10 +936,15 @@ const styles = StyleSheet.create({
     },
     modalContent: {
         backgroundColor: '#fff',
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
-        padding: 20,
-        paddingBottom: 30,
+        borderTopLeftRadius: 28,
+        borderTopRightRadius: 28,
+        padding: 24,
+        paddingBottom: 40,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -8 },
+        shadowOpacity: 0.1,
+        shadowRadius: 20,
+        elevation: 8,
     },
     modalHeader: {
         flexDirection: 'row',
@@ -864,35 +953,43 @@ const styles = StyleSheet.create({
         marginBottom: 20,
     },
     modalTitle: {
-        fontSize: 20,
-        fontWeight: '700',
+        fontSize: 24,
+        fontWeight: '800',
         color: '#1F2937',
     },
     closeButton: {
-        padding: 4,
+        padding: 8,
+        backgroundColor: '#F3F4F6',
+        borderRadius: 12,
     },
     billPreview: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: '#F8FAFC',
-        padding: 16,
-        borderRadius: 12,
-        marginBottom: 20,
+        padding: 20,
+        borderRadius: 16,
+        marginBottom: 24,
     },
     billPreviewInfo: {
         flex: 1,
-        marginLeft: 12,
+        marginLeft: 16,
     },
     billPreviewName: {
-        fontSize: 16,
-        fontWeight: '600',
+        fontSize: 18,
+        fontWeight: '700',
         color: '#1F2937',
         marginBottom: 4,
     },
     billPreviewAmount: {
-        fontSize: 18,
-        fontWeight: '700',
+        fontSize: 20,
+        fontWeight: '800',
         color: '#6366F1',
+        marginBottom: 4,
+    },
+    billPreviewDue: {
+        fontSize: 14,
+        color: '#6B7280',
+        fontWeight: '500',
     },
     modalActions: {
         gap: 12,
@@ -900,22 +997,22 @@ const styles = StyleSheet.create({
     modalButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        padding: 16,
-        borderRadius: 12,
-        borderWidth: 1,
-    },
-    editButtonModal: {
-        borderColor: '#E5E7EB',
+        padding: 20,
+        borderRadius: 16,
         backgroundColor: '#F8FAFC',
     },
-    deleteButtonModal: {
-        borderColor: '#FEE2E2',
-        backgroundColor: '#FEF2F2',
+    modalButtonIcon: {
+        width: 44,
+        height: 44,
+        borderRadius: 14,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
     },
     modalButtonText: {
         fontSize: 16,
-        fontWeight: '600',
-        marginLeft: 12,
+        fontWeight: '700',
+        color: '#1F2937',
     },
 });
 

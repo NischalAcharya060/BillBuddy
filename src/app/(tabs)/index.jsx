@@ -1,5 +1,5 @@
 // src/app/(tabs)/index.jsx
-import { View, Text, StyleSheet, ScrollView, Animated, TouchableOpacity, Alert, RefreshControl } from "react-native";
+import { View, Text, StyleSheet, ScrollView, Animated, TouchableOpacity, Alert, RefreshControl, Dimensions } from "react-native";
 import React, { useEffect, useRef, useState } from "react";
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,6 +7,8 @@ import { useAuth } from "../../contexts/AuthContext";
 import { useRouter } from "expo-router";
 import { db } from "../../firebase/config";
 import { collection, query, where, onSnapshot, orderBy } from "firebase/firestore";
+
+const { width } = Dimensions.get('window');
 
 const Dashboard = () => {
     const { user, logout } = useAuth();
@@ -16,12 +18,12 @@ const Dashboard = () => {
     const [refreshing, setRefreshing] = useState(false);
 
     const fadeAnim = useRef(new Animated.Value(0)).current;
-    const slideAnim = useRef(new Animated.Value(20)).current;
+    const slideAnim = useRef(new Animated.Value(30)).current;
+    const scaleAnim = useRef(new Animated.Value(0.9)).current;
 
     useEffect(() => {
         if (!user) return;
 
-        // Set up real-time listener for user's bills
         const billsQuery = query(
             collection(db, 'bills'),
             where('userId', '==', user.uid),
@@ -41,7 +43,6 @@ const Dashboard = () => {
                     });
                 });
 
-                // Calculate status for each bill
                 const billsWithStatus = billsData.map(bill => {
                     const status = calculateBillStatus(bill);
                     return {
@@ -55,16 +56,22 @@ const Dashboard = () => {
                 setLoading(false);
                 setRefreshing(false);
 
-                // Start animations after data loads
+                // Enhanced animations
                 Animated.parallel([
                     Animated.timing(fadeAnim, {
                         toValue: 1,
-                        duration: 600,
+                        duration: 800,
                         useNativeDriver: true,
                     }),
                     Animated.timing(slideAnim, {
                         toValue: 0,
-                        duration: 600,
+                        duration: 800,
+                        useNativeDriver: true,
+                    }),
+                    Animated.spring(scaleAnim, {
+                        toValue: 1,
+                        tension: 20,
+                        friction: 7,
                         useNativeDriver: true,
                     })
                 ]).start();
@@ -83,23 +90,16 @@ const Dashboard = () => {
         const today = new Date();
         const dueDate = bill.dueTimestamp;
 
-        // If bill is marked as paid in Firestore
         if (bill.status === 'paid') return 'paid';
-
-        // If due date is in the past
         if (dueDate < today) return 'overdue';
-
-        // Otherwise pending
         return 'pending';
     };
 
-    // Calculate dashboard statistics
     const calculateStats = () => {
         const today = new Date();
         const thisMonth = today.getMonth();
         const thisYear = today.getFullYear();
 
-        // Monthly spending (paid bills this month)
         const monthlySpending = bills
             .filter(bill => {
                 if (bill.status !== 'paid') return false;
@@ -108,7 +108,6 @@ const Dashboard = () => {
             })
             .reduce((sum, bill) => sum + bill.amount, 0);
 
-        // Upcoming bills (due within next 7 days)
         const upcomingBills = bills.filter(bill => {
             if (bill.status === 'paid') return false;
             const dueDate = bill.dueTimestamp;
@@ -117,15 +116,13 @@ const Dashboard = () => {
             return diffDays >= 0 && diffDays <= 7;
         });
 
-        // Bills paid this month
         const billsPaidThisMonth = bills.filter(bill => {
             if (bill.status !== 'paid') return false;
             const paidDate = bill.paidAt?.toDate?.() || bill.updatedAt?.toDate?.() || new Date();
             return paidDate.getMonth() === thisMonth && paidDate.getFullYear() === thisYear;
         });
 
-        // Total savings (placeholder - you might want to calculate this differently)
-        const totalSavings = monthlySpending * 0.1; // Example: 10% of spending as savings
+        const totalSavings = monthlySpending * 0.1;
 
         return {
             monthlySpending,
@@ -142,10 +139,7 @@ const Dashboard = () => {
             "Logout",
             "Are you sure you want to logout?",
             [
-                {
-                    text: "Cancel",
-                    style: "cancel"
-                },
+                { text: "Cancel", style: "cancel" },
                 {
                     text: "Logout",
                     style: "destructive",
@@ -164,26 +158,17 @@ const Dashboard = () => {
 
     const onRefresh = () => {
         setRefreshing(true);
-        // The real-time listener will automatically update the data
     };
 
     const getUserInitial = () => {
-        if (user?.displayName) {
-            return user.displayName.charAt(0).toUpperCase();
-        }
-        if (user?.email) {
-            return user.email.charAt(0).toUpperCase();
-        }
+        if (user?.displayName) return user.displayName.charAt(0).toUpperCase();
+        if (user?.email) return user.email.charAt(0).toUpperCase();
         return "U";
     };
 
     const getUserName = () => {
-        if (user?.displayName) {
-            return user.displayName;
-        }
-        if (user?.email) {
-            return user.email.split('@')[0];
-        }
+        if (user?.displayName) return user.displayName;
+        if (user?.email) return user.email.split('@')[0];
         return "User";
     };
 
@@ -194,55 +179,68 @@ const Dashboard = () => {
         return "Good evening";
     };
 
-    const StatCard = ({ title, value, subtitle, icon, color, trend }) => (
+    const StatCard = ({ title, value, subtitle, icon, color, gradient }) => (
         <Animated.View
             style={[
                 styles.statCard,
                 {
                     opacity: fadeAnim,
-                    transform: [{ translateY: slideAnim }]
+                    transform: [
+                        { translateY: slideAnim },
+                        { scale: scaleAnim }
+                    ]
                 }
             ]}
         >
             <LinearGradient
-                colors={[color, `${color}DD`]}
-                style={styles.statIcon}
+                colors={gradient}
+                style={styles.statGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
             >
-                <Ionicons name={icon} size={24} color="#fff" />
-            </LinearGradient>
-            <View style={styles.statContent}>
+                <View style={styles.statHeader}>
+                    <View style={[styles.statIconContainer, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+                        <Ionicons name={icon} size={20} color="#fff" />
+                    </View>
+                    <View style={styles.statTrend}>
+                        <Ionicons name="trending-up" size={14} color="#fff" />
+                    </View>
+                </View>
                 <Text style={styles.statValue}>{value}</Text>
                 <Text style={styles.statTitle}>{title}</Text>
                 <Text style={styles.statSubtitle}>{subtitle}</Text>
-            </View>
-            {trend && (
-                <View style={[styles.trend, trend.type === 'up' ? styles.trendUp : styles.trendDown]}>
-                    <Ionicons
-                        name={trend.type === 'up' ? "trending-up" : "trending-down"}
-                        size={16}
-                        color={trend.type === 'up' ? '#10B981' : '#EF4444'}
-                    />
-                    <Text style={[
-                        styles.trendText,
-                        { color: trend.type === 'up' ? '#10B981' : '#EF4444' }
-                    ]}>
-                        {trend.value}
-                    </Text>
-                </View>
-            )}
+            </LinearGradient>
         </Animated.View>
     );
 
-    const QuickAction = ({ title, icon, color, onPress }) => (
-        <TouchableOpacity style={styles.quickAction} onPress={onPress}>
-            <View style={[styles.actionIcon, { backgroundColor: color }]}>
-                <Ionicons name={icon} size={24} color="#fff" />
-            </View>
-            <Text style={styles.actionTitle}>{title}</Text>
+    const QuickAction = ({ title, icon, color, gradient, onPress }) => (
+        <TouchableOpacity onPress={onPress}>
+            <Animated.View
+                style={[
+                    styles.quickAction,
+                    {
+                        opacity: fadeAnim,
+                        transform: [
+                            { translateY: slideAnim },
+                            { scale: scaleAnim }
+                        ]
+                    }
+                ]}
+            >
+                <LinearGradient
+                    colors={gradient}
+                    style={styles.actionGradient}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                >
+                    <Ionicons name={icon} size={24} color="#fff" />
+                </LinearGradient>
+                <Text style={styles.actionTitle}>{title}</Text>
+            </Animated.View>
         </TouchableOpacity>
     );
 
-    const UpcomingBillItem = ({ bill }) => {
+    const UpcomingBillItem = ({ bill, index }) => {
         const categoryColors = {
             electricity: '#F59E0B',
             rent: '#6366F1',
@@ -265,22 +263,38 @@ const Dashboard = () => {
         const isOverdue = daysUntilDue < 0;
 
         return (
-            <View style={styles.upcomingBillItem}>
-                <View style={[styles.billColorDot, { backgroundColor: categoryColors[bill.category] || '#6B7280' }]} />
-                <View style={styles.billInfo}>
-                    <Text style={styles.billName}>{bill.name}</Text>
-                    <Text style={styles.billDueDate}>
-                        Due {isOverdue ? 'Overdue' : `in ${daysUntilDue} days`}
-                    </Text>
+            <Animated.View
+                style={[
+                    styles.upcomingBillItem,
+                    {
+                        opacity: fadeAnim,
+                        transform: [
+                            { translateY: slideAnim },
+                            { translateX: new Animated.Value(0) }
+                        ]
+                    }
+                ]}
+            >
+                <View style={styles.billLeft}>
+                    <View style={[styles.billColorDot, { backgroundColor: categoryColors[bill.category] || '#6B7280' }]} />
+                    <View style={styles.billInfo}>
+                        <Text style={styles.billName}>{bill.name}</Text>
+                        <Text style={[
+                            styles.billDueDate,
+                            isOverdue && styles.overdueText
+                        ]}>
+                            {isOverdue ? 'Overdue' : `Due in ${daysUntilDue} days`}
+                        </Text>
+                    </View>
                 </View>
                 <Text style={styles.billAmount}>${bill.amount.toFixed(2)}</Text>
-            </View>
+            </Animated.View>
         );
     };
 
     const upcomingBills = bills
         .filter(bill => bill.status === 'pending' || bill.status === 'overdue')
-        .slice(0, 3); // Show only 3 upcoming bills
+        .slice(0, 3);
 
     return (
         <ScrollView
@@ -299,48 +313,48 @@ const Dashboard = () => {
             {/* Header */}
             <View style={styles.header}>
                 <View>
-                    <Text style={styles.greeting}>{getGreeting()}, {getUserName()}! 👋</Text>
-                    <Text style={styles.title}>Dashboard Overview</Text>
+                    <Text style={styles.greeting}>{getGreeting()} 🌟</Text>
+                    <Text style={styles.title}>Welcome back, {getUserName()}</Text>
                 </View>
                 <TouchableOpacity style={styles.avatarContainer} onPress={handleLogout}>
-                    <View style={styles.avatar}>
+                    <LinearGradient
+                        colors={['#6366F1', '#8B5CF6']}
+                        style={styles.avatar}
+                    >
                         <Text style={styles.avatarText}>{getUserInitial()}</Text>
-                    </View>
-                    <View style={styles.logoutBadge}>
-                        <Ionicons name="log-out-outline" size={12} color="#fff" />
-                    </View>
+                    </LinearGradient>
                 </TouchableOpacity>
             </View>
 
             {/* Stats Grid */}
             <View style={styles.statsGrid}>
                 <StatCard
-                    title="Monthly Spending"
-                    value={`$${stats.monthlySpending.toFixed(2)}`}
+                    title="Monthly Spend"
+                    value={`$${stats.monthlySpending.toFixed(0)}`}
                     subtitle="This month"
                     icon="wallet-outline"
-                    color="#6366F1"
+                    gradient={['#6366F1', '#8B5CF6']}
                 />
                 <StatCard
-                    title="Upcoming Bills"
+                    title="Upcoming"
                     value={stats.upcomingBills.toString()}
                     subtitle="Due this week"
                     icon="calendar-outline"
-                    color="#10B981"
+                    gradient={['#10B981', '#34D399']}
                 />
                 <StatCard
-                    title="Bills Paid"
+                    title="Paid"
                     value={stats.billsPaid.toString()}
                     subtitle="This month"
-                    icon="checkmark-circle-outline"
-                    color="#F59E0B"
+                    icon="checkmark-done"
+                    gradient={['#F59E0B', '#FBBF24']}
                 />
                 <StatCard
                     title="Savings"
-                    value={`$${stats.totalSavings.toFixed(2)}`}
+                    value={`$${stats.totalSavings.toFixed(0)}`}
                     subtitle="Total saved"
-                    icon="trending-up-outline"
-                    color="#EC4899"
+                    icon="trending-up"
+                    gradient={['#EC4899', '#F472B6']}
                 />
             </View>
 
@@ -358,26 +372,26 @@ const Dashboard = () => {
                 <View style={styles.actionsGrid}>
                     <QuickAction
                         title="Add Bill"
-                        icon="add-circle"
-                        color="#6366F1"
+                        icon="add"
+                        gradient={['#6366F1', '#8B5CF6']}
                         onPress={() => router.push('/(tabs)/add')}
                     />
                     <QuickAction
                         title="My Bills"
                         icon="document-text"
-                        color="#10B981"
+                        gradient={['#10B981', '#34D399']}
                         onPress={() => router.push('/(tabs)/bills')}
                     />
                     <QuickAction
                         title="Analytics"
                         icon="bar-chart"
-                        color="#F59E0B"
+                        gradient={['#F59E0B', '#FBBF24']}
                         onPress={() => router.push('/(tabs)/analytics')}
                     />
                     <QuickAction
-                        title="Split Bill"
+                        title="Split"
                         icon="people"
-                        color="#8B5CF6"
+                        gradient={['#EC4899', '#F472B6']}
                         onPress={() => router.push('/(tabs)/split')}
                     />
                 </View>
@@ -395,26 +409,30 @@ const Dashboard = () => {
             >
                 <View style={styles.sectionHeader}>
                     <Text style={styles.sectionTitle}>Upcoming Bills</Text>
-                    <TouchableOpacity onPress={() => router.push('/(tabs)/bills')}>
-                        <Text style={styles.seeAll}>See all</Text>
+                    <TouchableOpacity
+                        style={styles.seeAllButton}
+                        onPress={() => router.push('/(tabs)/bills')}
+                    >
+                        <Text style={styles.seeAllText}>View All</Text>
+                        <Ionicons name="chevron-forward" size={16} color="#6366F1" />
                     </TouchableOpacity>
                 </View>
                 {upcomingBills.length === 0 ? (
                     <View style={styles.emptyState}>
-                        <Ionicons name="document-text-outline" size={48} color="#9CA3AF" />
+                        <Ionicons name="document-text-outline" size={48} color="#D1D5DB" />
                         <Text style={styles.emptyTitle}>No upcoming bills</Text>
-                        <Text style={styles.emptySubtitle}>Add your first bill to get started</Text>
+                        <Text style={styles.emptySubtitle}>All caught up! 🎉</Text>
                     </View>
                 ) : (
                     <View style={styles.upcomingBillsList}>
-                        {upcomingBills.map((bill) => (
-                            <UpcomingBillItem key={bill.id} bill={bill} />
+                        {upcomingBills.map((bill, index) => (
+                            <UpcomingBillItem key={bill.id} bill={bill} index={index} />
                         ))}
                     </View>
                 )}
             </Animated.View>
 
-            {/* Recent Activity */}
+            {/* Profile Card */}
             <Animated.View
                 style={[
                     styles.section,
@@ -424,33 +442,12 @@ const Dashboard = () => {
                     }
                 ]}
             >
-                <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>Recent Activity</Text>
-                    <TouchableOpacity onPress={() => router.push('/(tabs)/bills')}>
-                        <Text style={styles.seeAll}>See all</Text>
-                    </TouchableOpacity>
-                </View>
-                <View style={styles.emptyState}>
-                    <Ionicons name="time-outline" size={48} color="#9CA3AF" />
-                    <Text style={styles.emptyTitle}>No recent activity</Text>
-                    <Text style={styles.emptySubtitle}>Your activity will appear here</Text>
-                </View>
-            </Animated.View>
-
-            {/* Profile Section */}
-            <Animated.View
-                style={[
-                    styles.section,
-                    {
-                        opacity: fadeAnim,
-                        transform: [{ translateY: slideAnim }]
-                    }
-                ]}
-            >
-                <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>Your Profile</Text>
-                </View>
-                <View style={styles.profileCard}>
+                <LinearGradient
+                    colors={['#6366F1', '#8B5CF6']}
+                    style={styles.profileCard}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                >
                     <View style={styles.profileInfo}>
                         <View style={styles.profileAvatar}>
                             <Text style={styles.profileAvatarText}>{getUserInitial()}</Text>
@@ -460,16 +457,23 @@ const Dashboard = () => {
                                 {user?.displayName || getUserName()}
                             </Text>
                             <Text style={styles.profileEmail}>{user?.email}</Text>
-                            <Text style={styles.profileStats}>
-                                {bills.length} bills • ${stats.monthlySpending.toFixed(2)} spent this month
-                            </Text>
+                            <View style={styles.profileStats}>
+                                <Text style={styles.profileStat}>
+                                    {bills.length} bills
+                                </Text>
+                                <Text style={styles.profileStat}>
+                                    ${stats.monthlySpending.toFixed(0)} spent
+                                </Text>
+                            </View>
                         </View>
                     </View>
-                    <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-                        <Ionicons name="log-out-outline" size={20} color="#EF4444" />
-                        <Text style={styles.logoutButtonText}>Logout</Text>
+                    <TouchableOpacity
+                        style={styles.logoutButton}
+                        onPress={handleLogout}
+                    >
+                        <Ionicons name="log-out-outline" size={20} color="#fff" />
                     </TouchableOpacity>
-                </View>
+                </LinearGradient>
             </Animated.View>
         </ScrollView>
     );
@@ -487,47 +491,41 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        padding: 20,
-        paddingBottom: 10,
+        padding: 24,
+        paddingTop: 60,
     },
     greeting: {
         fontSize: 16,
         color: '#6B7280',
+        fontWeight: '600',
         marginBottom: 4,
     },
     title: {
         fontSize: 28,
-        fontWeight: '700',
+        fontWeight: '800',
         color: '#1F2937',
+        letterSpacing: -0.5,
     },
     avatarContainer: {
-        position: 'relative',
+        shadowColor: '#6366F1',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.3,
+        shadowRadius: 12,
+        elevation: 8,
     },
     avatar: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: '#6366F1',
+        width: 52,
+        height: 52,
+        borderRadius: 26,
         justifyContent: 'center',
         alignItems: 'center',
+        borderWidth: 3,
+        borderColor: '#fff',
     },
     avatarText: {
         color: '#fff',
-        fontSize: 18,
-        fontWeight: '600',
-    },
-    logoutBadge: {
-        position: 'absolute',
-        top: -2,
-        right: -2,
-        backgroundColor: '#EF4444',
-        width: 16,
-        height: 16,
-        borderRadius: 8,
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderWidth: 2,
-        borderColor: '#fff',
+        fontSize: 20,
+        fontWeight: '700',
     },
     statsGrid: {
         flexDirection: 'row',
@@ -538,61 +536,49 @@ const styles = StyleSheet.create({
     statCard: {
         flex: 1,
         minWidth: '47%',
-        backgroundColor: '#fff',
-        padding: 16,
-        borderRadius: 16,
+        borderRadius: 20,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 12,
-        elevation: 4,
-        flexDirection: 'row',
-        alignItems: 'center',
+        shadowOffset: { width: 0, height: 12 },
+        shadowOpacity: 0.2,
+        shadowRadius: 20,
+        elevation: 8,
+        overflow: 'hidden',
     },
-    statIcon: {
-        width: 44,
-        height: 44,
-        borderRadius: 12,
+    statGradient: {
+        padding: 20,
+        borderRadius: 20,
+    },
+    statHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    statIconContainer: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
         justifyContent: 'center',
         alignItems: 'center',
-        marginRight: 12,
     },
-    statContent: {
-        flex: 1,
+    statTrend: {
+        opacity: 0.8,
     },
     statValue: {
-        fontSize: 20,
-        fontWeight: '700',
-        color: '#1F2937',
-        marginBottom: 2,
+        fontSize: 24,
+        fontWeight: '800',
+        color: '#fff',
+        marginBottom: 4,
     },
     statTitle: {
         fontSize: 14,
-        fontWeight: '600',
-        color: '#374151',
+        fontWeight: '700',
+        color: 'rgba(255,255,255,0.9)',
         marginBottom: 2,
     },
     statSubtitle: {
         fontSize: 12,
-        color: '#6B7280',
-    },
-    trend: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 6,
-        paddingVertical: 2,
-        borderRadius: 8,
-    },
-    trendUp: {
-        backgroundColor: 'rgba(16, 185, 129, 0.1)',
-    },
-    trendDown: {
-        backgroundColor: 'rgba(239, 68, 68, 0.1)',
-    },
-    trendText: {
-        fontSize: 12,
-        fontWeight: '600',
-        marginLeft: 2,
+        color: 'rgba(255,255,255,0.7)',
     },
     section: {
         marginTop: 8,
@@ -605,14 +591,24 @@ const styles = StyleSheet.create({
         marginBottom: 16,
     },
     sectionTitle: {
-        fontSize: 20,
-        fontWeight: '700',
+        fontSize: 22,
+        fontWeight: '800',
         color: '#1F2937',
+        letterSpacing: -0.5,
     },
-    seeAll: {
+    seeAllButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        backgroundColor: 'rgba(99, 102, 241, 0.1)',
+        borderRadius: 12,
+    },
+    seeAllText: {
         fontSize: 14,
         color: '#6366F1',
         fontWeight: '600',
+        marginRight: 4,
     },
     actionsGrid: {
         flexDirection: 'row',
@@ -622,45 +618,48 @@ const styles = StyleSheet.create({
     quickAction: {
         flex: 1,
         alignItems: 'center',
-        padding: 16,
-        backgroundColor: '#fff',
-        borderRadius: 16,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 8,
-        elevation: 2,
     },
-    actionIcon: {
-        width: 48,
-        height: 48,
-        borderRadius: 24,
+    actionGradient: {
+        width: 60,
+        height: 60,
+        borderRadius: 20,
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 8,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.2,
+        shadowRadius: 12,
+        elevation: 6,
     },
     actionTitle: {
         fontSize: 12,
-        fontWeight: '600',
+        fontWeight: '700',
         color: '#374151',
         textAlign: 'center',
     },
     upcomingBillsList: {
         backgroundColor: '#fff',
-        borderRadius: 16,
+        borderRadius: 20,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
+        shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.1,
-        shadowRadius: 8,
-        elevation: 2,
+        shadowRadius: 16,
+        elevation: 4,
         overflow: 'hidden',
     },
     upcomingBillItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        padding: 16,
+        justifyContent: 'space-between',
+        padding: 20,
         borderBottomWidth: 1,
-        borderBottomColor: '#F3F4F6',
+        borderBottomColor: 'rgba(0,0,0,0.05)',
+    },
+    billLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
     },
     billColorDot: {
         width: 12,
@@ -673,28 +672,32 @@ const styles = StyleSheet.create({
     },
     billName: {
         fontSize: 16,
-        fontWeight: '600',
+        fontWeight: '700',
         color: '#1F2937',
         marginBottom: 4,
     },
     billDueDate: {
         fontSize: 14,
         color: '#6B7280',
+        fontWeight: '500',
+    },
+    overdueText: {
+        color: '#EF4444',
+        fontWeight: '600',
     },
     billAmount: {
         fontSize: 16,
-        fontWeight: '700',
+        fontWeight: '800',
         color: '#1F2937',
     },
     profileCard: {
-        backgroundColor: '#fff',
-        padding: 20,
-        borderRadius: 16,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 8,
-        elevation: 2,
+        borderRadius: 24,
+        padding: 24,
+        shadowColor: '#6366F1',
+        shadowOffset: { width: 0, height: 12 },
+        shadowOpacity: 0.3,
+        shadowRadius: 20,
+        elevation: 12,
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
@@ -705,65 +708,70 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     profileAvatar: {
-        width: 50,
-        height: 50,
-        borderRadius: 25,
-        backgroundColor: '#6366F1',
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        backgroundColor: 'rgba(255,255,255,0.2)',
         justifyContent: 'center',
         alignItems: 'center',
-        marginRight: 12,
+        marginRight: 16,
+        borderWidth: 2,
+        borderColor: 'rgba(255,255,255,0.3)',
     },
     profileAvatarText: {
         color: '#fff',
         fontSize: 20,
-        fontWeight: '600',
+        fontWeight: '700',
     },
     profileDetails: {
         flex: 1,
     },
     profileName: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#1F2937',
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#fff',
         marginBottom: 2,
     },
     profileEmail: {
         fontSize: 14,
-        color: '#6B7280',
-        marginBottom: 4,
+        color: 'rgba(255,255,255,0.8)',
+        marginBottom: 8,
     },
     profileStats: {
+        flexDirection: 'row',
+        gap: 12,
+    },
+    profileStat: {
         fontSize: 12,
-        color: '#9CA3AF',
+        color: 'rgba(255,255,255,0.7)',
+        fontWeight: '600',
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 8,
     },
     logoutButton: {
-        flexDirection: 'row',
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        justifyContent: 'center',
         alignItems: 'center',
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        borderRadius: 8,
-        backgroundColor: 'rgba(239, 68, 68, 0.1)',
-    },
-    logoutButtonText: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#EF4444',
-        marginLeft: 6,
     },
     emptyState: {
         backgroundColor: '#fff',
         padding: 40,
-        borderRadius: 16,
+        borderRadius: 20,
         alignItems: 'center',
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
+        shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.1,
-        shadowRadius: 8,
-        elevation: 2,
+        shadowRadius: 16,
+        elevation: 4,
     },
     emptyTitle: {
         fontSize: 16,
-        fontWeight: '600',
+        fontWeight: '700',
         color: '#374151',
         marginTop: 12,
         marginBottom: 4,

@@ -2,7 +2,9 @@
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from 'expo-linear-gradient';
-import { View, Text, StyleSheet } from "react-native";
+import { View, StyleSheet, Dimensions } from "react-native";
+
+const { width } = Dimensions.get('window');
 
 const TabsLayout = () => {
     return (
@@ -11,66 +13,74 @@ const TabsLayout = () => {
                 tabBarActiveTintColor: '#6366F1',
                 tabBarInactiveTintColor: '#94A3B8',
                 tabBarStyle: {
-                    backgroundColor: '#fff',
-                    borderTopWidth: 1,
-                    borderTopColor: '#F1F5F9',
-                    height: 80,
-                    paddingBottom: 20,
-                    paddingTop: 8,
-                    shadowColor: '#000',
-                    shadowOffset: { width: 0, height: -2 },
-                    shadowOpacity: 0.08,
-                    shadowRadius: 12,
-                    elevation: 8,
+                    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                    borderTopWidth: 0,
+                    height: 90,
+                    paddingBottom: 25,
+                    paddingTop: 12,
+                    shadowColor: '#6366F1',
+                    shadowOffset: { width: 0, height: -8 },
+                    shadowOpacity: 0.12,
+                    shadowRadius: 20,
+                    elevation: 12,
+                    position: 'absolute',
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    borderTopLeftRadius: 24,
+                    borderTopRightRadius: 24,
+                    backdropFilter: 'blur(20px)',
                 },
+                tabBarBackground: () => (
+                    <View style={styles.tabBarBackground} />
+                ),
                 tabBarLabelStyle: {
-                    fontSize: 12,
-                    fontWeight: '600',
-                    marginTop: 4,
-                },
-                headerStyle: {
-                    backgroundColor: '#6366F1',
-                    shadowColor: '#000',
-                    shadowOffset: { width: 0, height: 4 },
-                    shadowOpacity: 0.1,
-                    shadowRadius: 12,
-                    elevation: 8,
-                },
-                headerTintColor: '#fff',
-                headerTitleStyle: {
+                    fontSize: 11,
                     fontWeight: '700',
-                    fontSize: 18,
+                    marginTop: 6,
+                    letterSpacing: -0.2,
                 },
-                headerTitleAlign: 'center',
+                headerShown: false, // This removes headers for all screens
             }}
         >
             <Tabs.Screen
                 name="index"
                 options={{
-                    title: 'Dashboard',
+                    title: 'Home',
                     tabBarIcon: ({ color, size, focused }) => (
                         <View style={focused ? styles.iconContainerFocused : styles.iconContainer}>
-                            <Ionicons
-                                name={focused ? "home" : "home-outline"}
-                                size={focused ? 24 : 22}
-                                color={focused ? '#6366F1' : color}
-                            />
+                            <View style={[
+                                styles.iconInner,
+                                focused && styles.iconInnerFocused
+                            ]}>
+                                <Ionicons
+                                    name={focused ? "home" : "home-outline"}
+                                    size={focused ? 22 : 20}
+                                    color={focused ? '#fff' : color}
+                                />
+                            </View>
+                            {focused && <View style={styles.activeDot} />}
                         </View>
                     ),
-                    headerTitle: 'BillBuddy Dashboard',
                 }}
             />
             <Tabs.Screen
                 name="bills"
                 options={{
-                    title: 'My Bills',
+                    title: 'Bills',
                     tabBarIcon: ({ color, size, focused }) => (
                         <View style={focused ? styles.iconContainerFocused : styles.iconContainer}>
-                            <Ionicons
-                                name={focused ? "document-text" : "document-text-outline"}
-                                size={focused ? 24 : 22}
-                                color={focused ? '#6366F1' : color}
-                            />
+                            <View style={[
+                                styles.iconInner,
+                                focused && styles.iconInnerFocused
+                            ]}>
+                                <Ionicons
+                                    name={focused ? "document-text" : "document-text-outline"}
+                                    size={focused ? 22 : 20}
+                                    color={focused ? '#fff' : color}
+                                />
+                            </View>
+                            {focused && <View style={styles.activeDot} />}
                         </View>
                     ),
                 }}
@@ -78,19 +88,25 @@ const TabsLayout = () => {
             <Tabs.Screen
                 name="add"
                 options={{
-                    title: 'Add Bill',
+                    title: 'Add',
                     tabBarIcon: ({ color, size, focused }) => (
                         <LinearGradient
                             colors={['#6366F1', '#8B5CF6']}
                             start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 0 }}
-                            style={styles.addButton}
+                            end={{ x: 1, y: 1 }}
+                            style={[
+                                styles.addButton,
+                                focused && styles.addButtonFocused
+                            ]}
                         >
                             <Ionicons
                                 name="add"
-                                size={28}
+                                size={26}
                                 color="#fff"
                             />
+                            {focused && (
+                                <View style={styles.addButtonGlow} />
+                            )}
                         </LinearGradient>
                     ),
                     tabBarLabel: () => null,
@@ -99,14 +115,20 @@ const TabsLayout = () => {
             <Tabs.Screen
                 name="analytics"
                 options={{
-                    title: 'Analytics',
+                    title: 'Stats',
                     tabBarIcon: ({ color, size, focused }) => (
                         <View style={focused ? styles.iconContainerFocused : styles.iconContainer}>
-                            <Ionicons
-                                name={focused ? "pie-chart" : "pie-chart-outline"}
-                                size={focused ? 24 : 22}
-                                color={focused ? '#6366F1' : color}
-                            />
+                            <View style={[
+                                styles.iconInner,
+                                focused && styles.iconInnerFocused
+                            ]}>
+                                <Ionicons
+                                    name={focused ? "stats-chart" : "stats-chart-outline"}
+                                    size={focused ? 22 : 20}
+                                    color={focused ? '#fff' : color}
+                                />
+                            </View>
+                            {focused && <View style={styles.activeDot} />}
                         </View>
                     ),
                 }}
@@ -117,11 +139,17 @@ const TabsLayout = () => {
                     title: 'Split',
                     tabBarIcon: ({ color, size, focused }) => (
                         <View style={focused ? styles.iconContainerFocused : styles.iconContainer}>
-                            <Ionicons
-                                name={focused ? "people" : "people-outline"}
-                                size={focused ? 24 : 22}
-                                color={focused ? '#6366F1' : color}
-                            />
+                            <View style={[
+                                styles.iconInner,
+                                focused && styles.iconInnerFocused
+                            ]}>
+                                <Ionicons
+                                    name={focused ? "people" : "people-outline"}
+                                    size={focused ? 22 : 20}
+                                    color={focused ? '#fff' : color}
+                                />
+                            </View>
+                            {focused && <View style={styles.activeDot} />}
                         </View>
                     ),
                 }}
@@ -138,32 +166,73 @@ const TabsLayout = () => {
 };
 
 const styles = StyleSheet.create({
+    tabBarBackground: {
+        flex: 1,
+        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        overflow: 'hidden',
+    },
     iconContainer: {
-        width: 24,
-        height: 24,
-        justifyContent: 'center',
         alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 8,
     },
     iconContainerFocused: {
-        width: 40,
-        height: 40,
-        justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: 'rgba(99, 102, 241, 0.1)',
-        borderRadius: 20,
+        justifyContent: 'center',
+        paddingVertical: 8,
     },
-    addButton: {
-        width: 56,
-        height: 56,
-        borderRadius: 28,
-        justifyContent: 'center',
+    iconInner: {
+        width: 28,
+        height: 28,
+        borderRadius: 14,
         alignItems: 'center',
-        marginTop: -20,
+        justifyContent: 'center',
+        backgroundColor: 'transparent',
+    },
+    iconInnerFocused: {
+        backgroundColor: '#6366F1',
         shadowColor: '#6366F1',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
         shadowRadius: 8,
         elevation: 6,
+    },
+    activeDot: {
+        width: 4,
+        height: 4,
+        borderRadius: 2,
+        backgroundColor: '#6366F1',
+        marginTop: 4,
+    },
+    addButton: {
+        width: 60,
+        height: 60,
+        borderRadius: 30,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginTop: -30,
+        shadowColor: '#6366F1',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.4,
+        shadowRadius: 16,
+        elevation: 12,
+        borderWidth: 3,
+        borderColor: '#fff',
+    },
+    addButtonFocused: {
+        transform: [{ scale: 1.05 }],
+        shadowColor: '#8B5CF6',
+        shadowOpacity: 0.6,
+    },
+    addButtonGlow: {
+        position: 'absolute',
+        width: 70,
+        height: 70,
+        borderRadius: 35,
+        backgroundColor: 'rgba(99, 102, 241, 0.2)',
+        zIndex: -1,
     },
 });
 
