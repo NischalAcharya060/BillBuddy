@@ -154,9 +154,15 @@ const TabsLayout = () => {
                     ),
                 }}
             />
-            {/* Hide edit-bill from tab bar */}
+            {/* Hide edit-bill and group details from tab bar */}
             <Tabs.Screen
                 name="edit-bill"
+                options={{
+                    href: null,
+                }}
+            />
+            <Tabs.Screen
+                name="group-details"
                 options={{
                     href: null,
                 }}

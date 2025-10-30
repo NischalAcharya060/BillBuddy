@@ -8,7 +8,7 @@ import { useRouter } from "expo-router";
 import { db } from "../../firebase/config";
 import { collection, query, where, onSnapshot, orderBy } from "firebase/firestore";
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 
 const Dashboard = () => {
     const { user, logout } = useAuth();
@@ -297,185 +297,190 @@ const Dashboard = () => {
         .slice(0, 3);
 
     return (
-        <ScrollView
-            style={styles.container}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.scrollContent}
-            refreshControl={
-                <RefreshControl
-                    refreshing={refreshing}
-                    onRefresh={onRefresh}
-                    colors={['#6366F1']}
-                    tintColor="#6366F1"
-                />
-            }
-        >
-            {/* Header */}
-            <View style={styles.header}>
-                <View>
-                    <Text style={styles.greeting}>{getGreeting()} 🌟</Text>
-                    <Text style={styles.title}>Welcome back, {getUserName()}</Text>
+        <View style={styles.container}>
+            <ScrollView
+                style={styles.scrollView}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.scrollContent}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        colors={['#6366F1']}
+                        tintColor="#6366F1"
+                    />
+                }
+            >
+                {/* Header */}
+                <View style={styles.header}>
+                    <View>
+                        <Text style={styles.greeting}>{getGreeting()} 🌟</Text>
+                        <Text style={styles.title}>Welcome back, {getUserName()}</Text>
+                    </View>
+                    <TouchableOpacity style={styles.avatarContainer} onPress={handleLogout}>
+                        <LinearGradient
+                            colors={['#6366F1', '#8B5CF6']}
+                            style={styles.avatar}
+                        >
+                            <Text style={styles.avatarText}>{getUserInitial()}</Text>
+                        </LinearGradient>
+                    </TouchableOpacity>
                 </View>
-                <TouchableOpacity style={styles.avatarContainer} onPress={handleLogout}>
+
+                {/* Stats Grid */}
+                <View style={styles.statsGrid}>
+                    <StatCard
+                        title="Monthly Spend"
+                        value={`$${stats.monthlySpending.toFixed(0)}`}
+                        subtitle="This month"
+                        icon="wallet-outline"
+                        gradient={['#6366F1', '#8B5CF6']}
+                    />
+                    <StatCard
+                        title="Upcoming"
+                        value={stats.upcomingBills.toString()}
+                        subtitle="Due this week"
+                        icon="calendar-outline"
+                        gradient={['#10B981', '#34D399']}
+                    />
+                    <StatCard
+                        title="Paid"
+                        value={stats.billsPaid.toString()}
+                        subtitle="This month"
+                        icon="checkmark-done"
+                        gradient={['#F59E0B', '#FBBF24']}
+                    />
+                    <StatCard
+                        title="Savings"
+                        value={`$${stats.totalSavings.toFixed(0)}`}
+                        subtitle="Total saved"
+                        icon="trending-up"
+                        gradient={['#EC4899', '#F472B6']}
+                    />
+                </View>
+
+                {/* Quick Actions */}
+                <Animated.View
+                    style={[
+                        styles.section,
+                        {
+                            opacity: fadeAnim,
+                            transform: [{ translateY: slideAnim }]
+                        }
+                    ]}
+                >
+                    <Text style={styles.sectionTitle}>Quick Actions</Text>
+                    <View style={styles.actionsGrid}>
+                        <QuickAction
+                            title="Add Bill"
+                            icon="add"
+                            gradient={['#6366F1', '#8B5CF6']}
+                            onPress={() => router.push('/(tabs)/add')}
+                        />
+                        <QuickAction
+                            title="My Bills"
+                            icon="document-text"
+                            gradient={['#10B981', '#34D399']}
+                            onPress={() => router.push('/(tabs)/bills')}
+                        />
+                        <QuickAction
+                            title="Analytics"
+                            icon="bar-chart"
+                            gradient={['#F59E0B', '#FBBF24']}
+                            onPress={() => router.push('/(tabs)/analytics')}
+                        />
+                        <QuickAction
+                            title="Split"
+                            icon="people"
+                            gradient={['#EC4899', '#F472B6']}
+                            onPress={() => router.push('/(tabs)/split')}
+                        />
+                    </View>
+                </Animated.View>
+
+                {/* Upcoming Bills */}
+                <Animated.View
+                    style={[
+                        styles.section,
+                        {
+                            opacity: fadeAnim,
+                            transform: [{ translateY: slideAnim }]
+                        }
+                    ]}
+                >
+                    <View style={styles.sectionHeader}>
+                        <Text style={styles.sectionTitle}>Upcoming Bills</Text>
+                        <TouchableOpacity
+                            style={styles.seeAllButton}
+                            onPress={() => router.push('/(tabs)/bills')}
+                        >
+                            <Text style={styles.seeAllText}>View All</Text>
+                            <Ionicons name="chevron-forward" size={16} color="#6366F1" />
+                        </TouchableOpacity>
+                    </View>
+                    {upcomingBills.length === 0 ? (
+                        <View style={styles.emptyState}>
+                            <Ionicons name="document-text-outline" size={48} color="#D1D5DB" />
+                            <Text style={styles.emptyTitle}>No upcoming bills</Text>
+                            <Text style={styles.emptySubtitle}>All caught up! 🎉</Text>
+                        </View>
+                    ) : (
+                        <View style={styles.upcomingBillsList}>
+                            {upcomingBills.map((bill, index) => (
+                                <UpcomingBillItem key={bill.id} bill={bill} index={index} />
+                            ))}
+                        </View>
+                    )}
+                </Animated.View>
+
+                {/* Profile Card */}
+                <Animated.View
+                    style={[
+                        styles.section,
+                        {
+                            opacity: fadeAnim,
+                            transform: [{ translateY: slideAnim }]
+                        }
+                    ]}
+                >
                     <LinearGradient
                         colors={['#6366F1', '#8B5CF6']}
-                        style={styles.avatar}
+                        style={styles.profileCard}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
                     >
-                        <Text style={styles.avatarText}>{getUserInitial()}</Text>
-                    </LinearGradient>
-                </TouchableOpacity>
-            </View>
-
-            {/* Stats Grid */}
-            <View style={styles.statsGrid}>
-                <StatCard
-                    title="Monthly Spend"
-                    value={`$${stats.monthlySpending.toFixed(0)}`}
-                    subtitle="This month"
-                    icon="wallet-outline"
-                    gradient={['#6366F1', '#8B5CF6']}
-                />
-                <StatCard
-                    title="Upcoming"
-                    value={stats.upcomingBills.toString()}
-                    subtitle="Due this week"
-                    icon="calendar-outline"
-                    gradient={['#10B981', '#34D399']}
-                />
-                <StatCard
-                    title="Paid"
-                    value={stats.billsPaid.toString()}
-                    subtitle="This month"
-                    icon="checkmark-done"
-                    gradient={['#F59E0B', '#FBBF24']}
-                />
-                <StatCard
-                    title="Savings"
-                    value={`$${stats.totalSavings.toFixed(0)}`}
-                    subtitle="Total saved"
-                    icon="trending-up"
-                    gradient={['#EC4899', '#F472B6']}
-                />
-            </View>
-
-            {/* Quick Actions */}
-            <Animated.View
-                style={[
-                    styles.section,
-                    {
-                        opacity: fadeAnim,
-                        transform: [{ translateY: slideAnim }]
-                    }
-                ]}
-            >
-                <Text style={styles.sectionTitle}>Quick Actions</Text>
-                <View style={styles.actionsGrid}>
-                    <QuickAction
-                        title="Add Bill"
-                        icon="add"
-                        gradient={['#6366F1', '#8B5CF6']}
-                        onPress={() => router.push('/(tabs)/add')}
-                    />
-                    <QuickAction
-                        title="My Bills"
-                        icon="document-text"
-                        gradient={['#10B981', '#34D399']}
-                        onPress={() => router.push('/(tabs)/bills')}
-                    />
-                    <QuickAction
-                        title="Analytics"
-                        icon="bar-chart"
-                        gradient={['#F59E0B', '#FBBF24']}
-                        onPress={() => router.push('/(tabs)/analytics')}
-                    />
-                    <QuickAction
-                        title="Split"
-                        icon="people"
-                        gradient={['#EC4899', '#F472B6']}
-                        onPress={() => router.push('/(tabs)/split')}
-                    />
-                </View>
-            </Animated.View>
-
-            {/* Upcoming Bills */}
-            <Animated.View
-                style={[
-                    styles.section,
-                    {
-                        opacity: fadeAnim,
-                        transform: [{ translateY: slideAnim }]
-                    }
-                ]}
-            >
-                <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>Upcoming Bills</Text>
-                    <TouchableOpacity
-                        style={styles.seeAllButton}
-                        onPress={() => router.push('/(tabs)/bills')}
-                    >
-                        <Text style={styles.seeAllText}>View All</Text>
-                        <Ionicons name="chevron-forward" size={16} color="#6366F1" />
-                    </TouchableOpacity>
-                </View>
-                {upcomingBills.length === 0 ? (
-                    <View style={styles.emptyState}>
-                        <Ionicons name="document-text-outline" size={48} color="#D1D5DB" />
-                        <Text style={styles.emptyTitle}>No upcoming bills</Text>
-                        <Text style={styles.emptySubtitle}>All caught up! 🎉</Text>
-                    </View>
-                ) : (
-                    <View style={styles.upcomingBillsList}>
-                        {upcomingBills.map((bill, index) => (
-                            <UpcomingBillItem key={bill.id} bill={bill} index={index} />
-                        ))}
-                    </View>
-                )}
-            </Animated.View>
-
-            {/* Profile Card */}
-            <Animated.View
-                style={[
-                    styles.section,
-                    {
-                        opacity: fadeAnim,
-                        transform: [{ translateY: slideAnim }]
-                    }
-                ]}
-            >
-                <LinearGradient
-                    colors={['#6366F1', '#8B5CF6']}
-                    style={styles.profileCard}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                >
-                    <View style={styles.profileInfo}>
-                        <View style={styles.profileAvatar}>
-                            <Text style={styles.profileAvatarText}>{getUserInitial()}</Text>
-                        </View>
-                        <View style={styles.profileDetails}>
-                            <Text style={styles.profileName}>
-                                {user?.displayName || getUserName()}
-                            </Text>
-                            <Text style={styles.profileEmail}>{user?.email}</Text>
-                            <View style={styles.profileStats}>
-                                <Text style={styles.profileStat}>
-                                    {bills.length} bills
+                        <View style={styles.profileInfo}>
+                            <View style={styles.profileAvatar}>
+                                <Text style={styles.profileAvatarText}>{getUserInitial()}</Text>
+                            </View>
+                            <View style={styles.profileDetails}>
+                                <Text style={styles.profileName}>
+                                    {user?.displayName || getUserName()}
                                 </Text>
-                                <Text style={styles.profileStat}>
-                                    ${stats.monthlySpending.toFixed(0)} spent
-                                </Text>
+                                <Text style={styles.profileEmail}>{user?.email}</Text>
+                                <View style={styles.profileStats}>
+                                    <Text style={styles.profileStat}>
+                                        {bills.length} bills
+                                    </Text>
+                                    <Text style={styles.profileStat}>
+                                        ${stats.monthlySpending.toFixed(0)} spent
+                                    </Text>
+                                </View>
                             </View>
                         </View>
-                    </View>
-                    <TouchableOpacity
-                        style={styles.logoutButton}
-                        onPress={handleLogout}
-                    >
-                        <Ionicons name="log-out-outline" size={20} color="#fff" />
-                    </TouchableOpacity>
-                </LinearGradient>
-            </Animated.View>
-        </ScrollView>
+                        <TouchableOpacity
+                            style={styles.logoutButton}
+                            onPress={handleLogout}
+                        >
+                            <Ionicons name="log-out-outline" size={20} color="#fff" />
+                        </TouchableOpacity>
+                    </LinearGradient>
+                </Animated.View>
+
+                {/* Extra padding at the bottom for better scrolling */}
+                <View style={styles.bottomPadding} />
+            </ScrollView>
+        </View>
     );
 };
 
@@ -484,15 +489,20 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: '#f8fafc',
     },
+    scrollView: {
+        flex: 1,
+    },
     scrollContent: {
+        flexGrow: 1,
         paddingBottom: 30,
     },
     header: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        padding: 24,
+        paddingHorizontal: 24,
         paddingTop: 60,
+        paddingBottom: 16,
     },
     greeting: {
         fontSize: 16,
@@ -530,12 +540,13 @@ const styles = StyleSheet.create({
     statsGrid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        padding: 16,
+        paddingHorizontal: 16,
+        paddingVertical: 8,
         gap: 12,
     },
     statCard: {
         flex: 1,
-        minWidth: '47%',
+        minWidth: (width - 56) / 2,
         borderRadius: 20,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 12 },
@@ -543,10 +554,12 @@ const styles = StyleSheet.create({
         shadowRadius: 20,
         elevation: 8,
         overflow: 'hidden',
+        marginBottom: 8,
     },
     statGradient: {
         padding: 20,
         borderRadius: 20,
+        minHeight: 140,
     },
     statHeader: {
         flexDirection: 'row',
@@ -582,7 +595,8 @@ const styles = StyleSheet.create({
     },
     section: {
         marginTop: 8,
-        padding: 16,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
     },
     sectionHeader: {
         flexDirection: 'row',
@@ -618,6 +632,7 @@ const styles = StyleSheet.create({
     quickAction: {
         flex: 1,
         alignItems: 'center',
+        minWidth: (width - 80) / 4, // Calculate width for 4 items
     },
     actionGradient: {
         width: 60,
@@ -701,6 +716,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
+        marginBottom: 20,
     },
     profileInfo: {
         flexDirection: 'row',
@@ -780,6 +796,9 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#6B7280',
         textAlign: 'center',
+    },
+    bottomPadding: {
+        height: 30,
     },
 });
 

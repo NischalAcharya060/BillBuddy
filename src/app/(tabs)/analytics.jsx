@@ -535,6 +535,7 @@ const Analytics = () => {
                     </Text>
                 </Animated.View>
             )}
+            <View style={styles.bottomPadding} />
         </ScrollView>
     );
 };
@@ -848,6 +849,9 @@ const styles = StyleSheet.create({
         fontSize: 16,
         color: '#6B7280',
         fontWeight: '500',
+    },
+    bottomPadding: {
+        height: 30,
     },
 });
 

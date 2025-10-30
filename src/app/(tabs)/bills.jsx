@@ -8,7 +8,7 @@ import { db } from "../../firebase/config";
 import { collection, query, where, onSnapshot, orderBy, updateDoc, doc, deleteDoc } from "firebase/firestore";
 import { useRouter } from "expo-router";
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 
 const Bills = () => {
     const { user } = useAuth();
@@ -605,6 +605,7 @@ const Bills = () => {
                     renderItem={({ item, index }) => <BillCard item={item} index={index} />}
                     contentContainerStyle={styles.listContent}
                     showsVerticalScrollIndicator={false}
+                    style={styles.flatList}
                     refreshControl={
                         <RefreshControl
                             refreshing={refreshing}
@@ -616,8 +617,8 @@ const Bills = () => {
                 />
             )}
 
-            {/* Edit Options Modal */}
             <EditOptionsModal />
+            <View style={styles.bottomPadding} />
         </View>
     );
 };
@@ -631,7 +632,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        padding: 24,
+        paddingHorizontal: 24,
         paddingTop: 60,
         paddingBottom: 16,
     },
@@ -654,7 +655,7 @@ const styles = StyleSheet.create({
     statsContainer: {
         flexDirection: 'row',
         backgroundColor: '#fff',
-        margin: 20,
+        marginHorizontal: 20,
         marginVertical: 8,
         padding: 20,
         borderRadius: 24,
@@ -740,9 +741,13 @@ const styles = StyleSheet.create({
         color: '#6366F1',
         marginLeft: 4,
     },
+    flatList: {
+        flex: 1,
+    },
     listContent: {
-        padding: 20,
+        paddingHorizontal: 20,
         paddingTop: 8,
+        paddingBottom: 30, // Added padding for better scrolling
     },
     billCard: {
         backgroundColor: '#fff',
@@ -885,7 +890,8 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        padding: 40,
+        paddingHorizontal: 40,
+        paddingBottom: 100, // Added padding to center it better
     },
     emptyTitle: {
         fontSize: 20,
@@ -1013,6 +1019,9 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '700',
         color: '#1F2937',
+    },
+    bottomPadding: {
+        height: 40,
     },
 });
 

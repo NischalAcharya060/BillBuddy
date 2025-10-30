@@ -91,7 +91,7 @@ const GroupOptionsModal = React.memo(({ visible, group, onClose, onEdit, onDelet
                         <View style={styles.groupPreviewInfo}>
                             <Text style={styles.groupPreviewName}>{group.name}</Text>
                             <Text style={styles.groupPreviewMembers}>
-                                {group.members.length} members
+                                {group.members?.length || 0} members
                             </Text>
                         </View>
                     </View>
@@ -416,7 +416,6 @@ const CreateGroupModal = React.memo(({ visible, onClose, onCreateGroup, editGrou
 const Split = () => {
     const { user } = useAuth();
     const router = useRouter();
-    const [activeTab, setActiveTab] = useState('groups');
     const [groups, setGroups] = useState([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -424,6 +423,7 @@ const Split = () => {
     const [showOptionsModal, setShowOptionsModal] = useState(false);
     const [selectedGroup, setSelectedGroup] = useState(null);
     const [editingGroup, setEditingGroup] = useState(null);
+    const [filter, setFilter] = useState('all');
 
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(20)).current;
@@ -434,8 +434,6 @@ const Split = () => {
         { id: 'active', name: 'Active', icon: 'play' },
         { id: 'settled', name: 'Settled', icon: 'checkmark' },
     ];
-
-    const [filter, setFilter] = useState('all');
 
     useEffect(() => {
         if (!user) return;
@@ -454,6 +452,8 @@ const Split = () => {
                         id: doc.id,
                         ...groupData,
                         createdAt: groupData.createdAt?.toDate?.() || new Date(),
+                        totalExpenses: groupData.totalExpenses || 0,
+                        pendingExpenses: groupData.pendingExpenses || 0,
                     });
                 });
 
@@ -486,6 +486,7 @@ const Split = () => {
             },
             (error) => {
                 console.error('Error fetching groups:', error);
+                Alert.alert('Error', 'Failed to load groups. Please try again.');
                 setLoading(false);
                 setRefreshing(false);
             }
@@ -510,9 +511,11 @@ const Split = () => {
                 createdAt: serverTimestamp(),
                 totalExpenses: 0,
                 pendingExpenses: 0,
+                expenses: [],
             };
 
             await addDoc(collection(db, 'splitGroups'), groupData);
+            Alert.alert('Success', 'Group created successfully!');
         } catch (error) {
             console.error('Error creating group:', error);
             Alert.alert('Error', 'Failed to create group. Please try again.');
@@ -531,6 +534,7 @@ const Split = () => {
                 members: allMembers,
                 updatedAt: serverTimestamp(),
             });
+            Alert.alert('Success', 'Group updated successfully!');
         } catch (error) {
             console.error('Error updating group:', error);
             Alert.alert('Error', 'Failed to update group. Please try again.');
@@ -552,6 +556,7 @@ const Split = () => {
                     onPress: async () => {
                         try {
                             await deleteDoc(doc(db, 'splitGroups', groupId));
+                            Alert.alert('Success', 'Group deleted successfully!');
                         } catch (error) {
                             console.error('Error deleting group:', error);
                             Alert.alert('Error', 'Failed to delete group');
@@ -574,14 +579,20 @@ const Split = () => {
 
     const handleViewGroup = useCallback((group) => {
         router.push({
-            pathname: '/group-details',
-            params: { groupId: group.id }
+            pathname: '/(tabs)/group-details',
+            params: {
+                groupId: group.id,
+                groupName: group.name,
+                members: JSON.stringify(group.members || []),
+                totalExpenses: group.totalExpenses || 0,
+                pendingExpenses: group.pendingExpenses || 0
+            }
         });
-    }, []);
+    }, [router]);
 
     const StatsOverview = () => {
         const totalGroups = groups.length;
-        const totalMembers = groups.reduce((sum, group) => sum + group.members.length, 0);
+        const totalMembers = groups.reduce((sum, group) => sum + (group.members?.length || 0), 0);
         const totalExpenses = groups.reduce((sum, group) => sum + (group.totalExpenses || 0), 0);
         const pendingExpenses = groups.reduce((sum, group) => sum + (group.pendingExpenses || 0), 0);
 
@@ -644,7 +655,7 @@ const Split = () => {
             }).start();
         }, []);
 
-        const averageExpense = group.members ? Math.ceil((group.totalExpenses || 0) / group.members.length) : 0;
+        const averageExpense = group.members?.length ? Math.ceil((group.totalExpenses || 0) / group.members.length) : 0;
 
         return (
             <Animated.View
@@ -653,10 +664,12 @@ const Split = () => {
                     {
                         opacity: cardAnim,
                         transform: [
-                            { translateY: cardAnim.interpolate({
+                            {
+                                translateY: cardAnim.interpolate({
                                     inputRange: [0, 1],
                                     outputRange: [30, 0]
-                                })}
+                                })
+                            }
                         ]
                     }
                 ]}
@@ -672,7 +685,7 @@ const Split = () => {
                         <View style={styles.groupDetails}>
                             <Text style={styles.groupName}>{group.name}</Text>
                             <Text style={styles.groupMembers}>
-                                {group.members.length} members
+                                {group.members?.length || 0} members
                             </Text>
                         </View>
                     </View>
@@ -702,7 +715,7 @@ const Split = () => {
                 </View>
 
                 <View style={styles.membersList}>
-                    {group.members.slice(0, 4).map((member, index) => (
+                    {group.members?.slice(0, 4).map((member, index) => (
                         <View key={index} style={styles.memberChip}>
                             <Ionicons name="person" size={12} color="#6366F1" />
                             <Text style={styles.memberText}>
@@ -710,7 +723,7 @@ const Split = () => {
                             </Text>
                         </View>
                     ))}
-                    {group.members.length > 4 && (
+                    {group.members?.length > 4 && (
                         <View style={styles.memberChip}>
                             <Text style={styles.memberText}>
                                 +{group.members.length - 4}
@@ -867,6 +880,7 @@ const Split = () => {
                     )}
                     contentContainerStyle={styles.listContent}
                     showsVerticalScrollIndicator={false}
+                    style={styles.flatList}
                     refreshControl={
                         <RefreshControl
                             refreshing={refreshing}
@@ -910,7 +924,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'flex-start',
-        padding: 24,
+        paddingHorizontal: 24,
         paddingTop: 60,
         paddingBottom: 16,
     },
@@ -944,7 +958,7 @@ const styles = StyleSheet.create({
     statsContainer: {
         flexDirection: 'row',
         backgroundColor: '#fff',
-        margin: 20,
+        marginHorizontal: 20,
         marginVertical: 8,
         padding: 20,
         borderRadius: 24,
@@ -1014,9 +1028,13 @@ const styles = StyleSheet.create({
     filterTextActive: {
         color: '#fff',
     },
+    flatList: {
+        flex: 1,
+    },
     listContent: {
-        padding: 20,
+        paddingHorizontal: 20,
         paddingTop: 8,
+        paddingBottom: 30,
     },
     groupCard: {
         backgroundColor: '#fff',
@@ -1090,19 +1108,6 @@ const styles = StyleSheet.create({
         height: 24,
         backgroundColor: '#E5E7EB',
     },
-    // statValue: {
-    //     fontSize: 16,
-    //     fontWeight: '800',
-    //     color: '#1F2937',
-    //     marginBottom: 4,
-    // },
-    // statLabel: {
-    //     fontSize: 12,
-    //     color: '#6B7280',
-    //     fontWeight: '600',
-    //     textTransform: 'uppercase',
-    //     letterSpacing: 0.5,
-    // },
     membersList: {
         flexDirection: 'row',
         flexWrap: 'wrap',
@@ -1143,7 +1148,8 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        padding: 40,
+        paddingHorizontal: 40,
+        paddingBottom: 100,
     },
     emptyTitle: {
         fontSize: 20,
