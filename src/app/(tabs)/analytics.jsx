@@ -15,15 +15,57 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from "../../contexts/AuthContext";
 import { db } from "../../firebase/config";
 import { collection, query, where, onSnapshot, orderBy } from "firebase/firestore";
+import { useTheme } from "../../contexts/ThemeContext";
 
 const { width: screenWidth } = Dimensions.get('window');
 
+// Theme colors
+const lightColors = {
+    background: '#f8fafc',
+    surface: '#ffffff',
+    surfaceSecondary: '#f9fafb',
+    textPrimary: '#1F2937',
+    textSecondary: '#6B7280',
+    textTertiary: '#9CA3AF',
+    border: '#E5E7EB',
+    primary: '#6366F1',
+    primaryLight: 'rgba(99, 102, 241, 0.1)',
+    gradient: ['#6366F1', '#8B5CF6'],
+    shadow: '#000',
+    disabled: '#F9FAFB',
+    success: '#10B981',
+    warning: '#F59E0B',
+    danger: '#EF4444',
+};
+
+const darkColors = {
+    background: '#0f172a',
+    surface: '#1e293b',
+    surfaceSecondary: '#334155',
+    textPrimary: '#f1f5f9',
+    textSecondary: '#cbd5e1',
+    textTertiary: '#64748b',
+    border: '#334155',
+    primary: '#818cf8',
+    primaryLight: 'rgba(129, 140, 248, 0.1)',
+    gradient: ['#818cf8', '#a78bfa'],
+    shadow: '#000',
+    disabled: '#1e293b',
+    success: '#34D399',
+    warning: '#FBBF24',
+    danger: '#F87171',
+};
+
 const Analytics = () => {
     const { user } = useAuth();
+    const { isDark } = useTheme();
     const [bills, setBills] = useState([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [timeRange, setTimeRange] = useState('month');
+
+    const colors = isDark ? darkColors : lightColors;
+    const styles = createStyles(colors, isDark);
 
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(30)).current;
@@ -112,13 +154,13 @@ const Analytics = () => {
         const categorySpending = {};
         const categoryColors = {
             electricity: { color: '#F59E0B', gradient: ['#F59E0B', '#D97706'] },
-            rent: { color: '#6366F1', gradient: ['#6366F1', '#8B5CF6'] },
+            rent: { color: colors.primary, gradient: isDark ? ['#818cf8', '#a78bfa'] : ['#6366F1', '#8B5CF6'] },
             wifi: { color: '#10B981', gradient: ['#10B981', '#059669'] },
             subscriptions: { color: '#EC4899', gradient: ['#EC4899', '#DB2777'] },
             water: { color: '#06B6D4', gradient: ['#06B6D4', '#0891B2'] },
             gas: { color: '#EF4444', gradient: ['#EF4444', '#DC2626'] },
             phone: { color: '#8B5CF6', gradient: ['#8B5CF6', '#7C3AED'] },
-            other: { color: '#6B7280', gradient: ['#6B7280', '#4B5563'] },
+            other: { color: colors.textTertiary, gradient: isDark ? ['#64748b', '#475569'] : ['#6B7280', '#4B5563'] },
         };
 
         filteredBills.forEach(bill => {
@@ -168,8 +210,8 @@ const Analytics = () => {
             .map(([category, amount]) => ({
                 category,
                 amount,
-                color: categoryColors[category]?.color || '#6B7280',
-                gradient: categoryColors[category]?.gradient || ['#6B7280', '#4B5563'],
+                color: categoryColors[category]?.color || colors.textTertiary,
+                gradient: categoryColors[category]?.gradient || (isDark ? ['#64748b', '#475569'] : ['#6B7280', '#4B5563']),
                 percentage: totalSpent > 0 ? (amount / totalSpent * 100) : 0
             }));
 
@@ -237,7 +279,7 @@ const Analytics = () => {
                     onPress={() => setTimeRange(range.id)}
                 >
                     <LinearGradient
-                        colors={timeRange === range.id ? ['#6366F1', '#8B5CF6'] : ['#F3F4F6', '#E5E7EB']}
+                        colors={timeRange === range.id ? colors.gradient : isDark ? ['#334155', '#475569'] : ['#F3F4F6', '#E5E7EB']}
                         style={styles.timeRangeGradient}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 1 }}
@@ -245,7 +287,7 @@ const Analytics = () => {
                         <Ionicons
                             name={range.icon}
                             size={16}
-                            color={timeRange === range.id ? '#fff' : '#6B7280'}
+                            color={timeRange === range.id ? '#fff' : colors.textSecondary}
                         />
                         <Text style={[
                             styles.timeRangeText,
@@ -275,7 +317,7 @@ const Analytics = () => {
                         </View>
                         <View style={styles.barBackground}>
                             <LinearGradient
-                                colors={['#6366F1', '#8B5CF6']}
+                                colors={colors.gradient}
                                 style={[
                                     styles.barFill,
                                     {
@@ -361,7 +403,7 @@ const Analytics = () => {
                     <Text style={styles.subtitle}>Track your spending patterns</Text>
                 </View>
                 <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color="#6366F1" />
+                    <ActivityIndicator size="large" color={colors.primary} />
                     <Text style={styles.loadingText}>Loading analytics...</Text>
                 </View>
             </View>
@@ -377,8 +419,9 @@ const Analytics = () => {
                 <RefreshControl
                     refreshing={refreshing}
                     onRefresh={onRefresh}
-                    colors={['#6366F1']}
-                    tintColor="#6366F1"
+                    colors={[colors.primary]}
+                    tintColor={colors.primary}
+                    progressBackgroundColor={colors.surface}
                 />
             }
         >
@@ -398,7 +441,7 @@ const Analytics = () => {
                     value={`$${analytics.totalSpent.toFixed(0)}`}
                     subtitle={`${timeRange}ly total`}
                     icon="wallet-outline"
-                    gradient={['#6366F1', '#8B5CF6']}
+                    gradient={colors.gradient}
                 />
                 <StatCard
                     title="Avg. Bill"
@@ -496,7 +539,7 @@ const Analytics = () => {
                         value={`${analytics.paidBills}/${analytics.paidBills + analytics.pendingBills}`}
                         subtitle="Paid bills"
                         icon="checkmark-circle"
-                        gradient={['#6366F1', '#8B5CF6']}
+                        gradient={colors.gradient}
                     />
 
                     <InsightCard
@@ -528,7 +571,7 @@ const Analytics = () => {
                         }
                     ]}
                 >
-                    <Ionicons name="stats-chart" size={64} color="#D1D5DB" />
+                    <Ionicons name="stats-chart" size={64} color={colors.textTertiary} />
                     <Text style={styles.emptyTitle}>No data yet</Text>
                     <Text style={styles.emptySubtitle}>
                         Add and pay some bills to see your analytics
@@ -540,10 +583,10 @@ const Analytics = () => {
     );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors, isDark) => StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#f8fafc',
+        backgroundColor: colors.background,
     },
     scrollContent: {
         paddingBottom: 40,
@@ -556,22 +599,22 @@ const styles = StyleSheet.create({
     title: {
         fontSize: 32,
         fontWeight: '800',
-        color: '#1F2937',
+        color: colors.textPrimary,
         letterSpacing: -0.5,
         marginBottom: 4,
     },
     subtitle: {
         fontSize: 16,
-        color: '#6B7280',
+        color: colors.textSecondary,
         fontWeight: '500',
         marginBottom: 20,
     },
     timeRangeContainer: {
         flexDirection: 'row',
-        backgroundColor: '#fff',
+        backgroundColor: colors.surface,
         borderRadius: 16,
         padding: 6,
-        shadowColor: '#000',
+        shadowColor: colors.shadow,
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.1,
         shadowRadius: 12,
@@ -583,7 +626,7 @@ const styles = StyleSheet.create({
         overflow: 'hidden',
     },
     timeRangeButtonActive: {
-        shadowColor: '#6366F1',
+        shadowColor: colors.primary,
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
         shadowRadius: 8,
@@ -601,7 +644,7 @@ const styles = StyleSheet.create({
     timeRangeText: {
         fontSize: 13,
         fontWeight: '600',
-        color: '#6B7280',
+        color: colors.textSecondary,
     },
     timeRangeTextActive: {
         color: '#fff',
@@ -616,7 +659,7 @@ const styles = StyleSheet.create({
         flex: 1,
         minWidth: '47%',
         borderRadius: 20,
-        shadowColor: '#000',
+        shadowColor: colors.shadow,
         shadowOffset: { width: 0, height: 12 },
         shadowOpacity: 0.2,
         shadowRadius: 20,
@@ -661,11 +704,11 @@ const styles = StyleSheet.create({
         color: 'rgba(255,255,255,0.7)',
     },
     chartSection: {
-        backgroundColor: '#fff',
+        backgroundColor: colors.surface,
         margin: 16,
         padding: 24,
         borderRadius: 24,
-        shadowColor: '#000',
+        shadowColor: colors.shadow,
         shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.1,
         shadowRadius: 20,
@@ -677,12 +720,12 @@ const styles = StyleSheet.create({
     sectionTitle: {
         fontSize: 22,
         fontWeight: '800',
-        color: '#1F2937',
+        color: colors.textPrimary,
         letterSpacing: -0.5,
     },
     sectionSubtitle: {
         fontSize: 14,
-        color: '#6B7280',
+        color: colors.textSecondary,
         fontWeight: '500',
         marginTop: 4,
     },
@@ -701,16 +744,16 @@ const styles = StyleSheet.create({
     barLabel: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#374151',
+        color: colors.textPrimary,
     },
     barValue: {
         fontSize: 14,
         fontWeight: '700',
-        color: '#6366F1',
+        color: colors.primary,
     },
     barBackground: {
         height: 10,
-        backgroundColor: '#F3F4F6',
+        backgroundColor: isDark ? colors.surfaceSecondary : '#F3F4F6',
         borderRadius: 5,
         overflow: 'hidden',
     },
@@ -740,7 +783,7 @@ const styles = StyleSheet.create({
         height: 16,
         borderRadius: 8,
         marginRight: 12,
-        shadowColor: '#000',
+        shadowColor: colors.shadow,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.2,
         shadowRadius: 4,
@@ -749,7 +792,7 @@ const styles = StyleSheet.create({
     categoryName: {
         fontSize: 15,
         fontWeight: '600',
-        color: '#374151',
+        color: colors.textPrimary,
         textTransform: 'capitalize',
     },
     categoryAmount: {
@@ -758,17 +801,17 @@ const styles = StyleSheet.create({
     categoryValue: {
         fontSize: 15,
         fontWeight: '700',
-        color: '#1F2937',
+        color: colors.textPrimary,
         marginBottom: 2,
     },
     categoryPercentage: {
         fontSize: 13,
-        color: '#6B7280',
+        color: colors.textSecondary,
         fontWeight: '500',
     },
     progressBarBackground: {
         height: 8,
-        backgroundColor: '#F3F4F6',
+        backgroundColor: isDark ? colors.surfaceSecondary : '#F3F4F6',
         borderRadius: 4,
         overflow: 'hidden',
     },
@@ -788,7 +831,7 @@ const styles = StyleSheet.create({
         flex: 1,
         minWidth: '47%',
         borderRadius: 20,
-        shadowColor: '#000',
+        shadowColor: colors.shadow,
         shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.2,
         shadowRadius: 16,
@@ -828,13 +871,13 @@ const styles = StyleSheet.create({
     emptyTitle: {
         fontSize: 20,
         fontWeight: '700',
-        color: '#374151',
+        color: colors.textPrimary,
         marginTop: 16,
         marginBottom: 8,
     },
     emptySubtitle: {
         fontSize: 16,
-        color: '#6B7280',
+        color: colors.textSecondary,
         textAlign: 'center',
         lineHeight: 22,
     },
@@ -847,7 +890,7 @@ const styles = StyleSheet.create({
     loadingText: {
         marginTop: 16,
         fontSize: 16,
-        color: '#6B7280',
+        color: colors.textSecondary,
         fontWeight: '500',
     },
     bottomPadding: {

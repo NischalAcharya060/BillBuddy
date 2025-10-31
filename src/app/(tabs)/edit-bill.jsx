@@ -8,13 +8,48 @@ import { useAuth } from "../../contexts/AuthContext";
 import { db } from "../../firebase/config";
 import { doc, getDoc, updateDoc, deleteDoc } from "firebase/firestore";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { useTheme } from "../../contexts/ThemeContext";
 
 const { width } = Dimensions.get('window');
+
+// Theme colors
+const lightColors = {
+    background: '#f8fafc',
+    surface: '#ffffff',
+    textPrimary: '#1F2937',
+    textSecondary: '#6B7280',
+    textTertiary: '#9CA3AF',
+    border: '#E5E7EB',
+    primary: '#6366F1',
+    primaryLight: 'rgba(99, 102, 241, 0.1)',
+    gradient: ['#6366F1', '#8B5CF6'],
+    shadow: '#000',
+    disabled: '#F9FAFB',
+    danger: '#EF4444',
+    dangerGradient: ['#EF4444', '#DC2626'],
+};
+
+const darkColors = {
+    background: '#0f172a',
+    surface: '#1e293b',
+    textPrimary: '#f1f5f9',
+    textSecondary: '#cbd5e1',
+    textTertiary: '#64748b',
+    border: '#334155',
+    primary: '#818cf8',
+    primaryLight: 'rgba(129, 140, 248, 0.1)',
+    gradient: ['#818cf8', '#a78bfa'],
+    shadow: '#000',
+    disabled: '#1e293b',
+    danger: '#F87171',
+    dangerGradient: ['#F87171', '#EF4444'],
+};
 
 const EditBill = () => {
     const { billId } = useLocalSearchParams();
     const router = useRouter();
     const { user } = useAuth();
+    const { isDark } = useTheme();
 
     const [billName, setBillName] = useState('');
     const [amount, setAmount] = useState('');
@@ -25,6 +60,9 @@ const EditBill = () => {
     const [isRecurring, setIsRecurring] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
+
+    const colors = isDark ? darkColors : lightColors;
+    const styles = createStyles(colors, isDark);
 
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(30)).current;
@@ -53,13 +91,13 @@ const EditBill = () => {
 
     const categories = [
         { id: 'electricity', name: 'Electricity', icon: 'flash', color: '#F59E0B', gradient: ['#F59E0B', '#D97706'] },
-        { id: 'rent', name: 'Rent', icon: 'home', color: '#6366F1', gradient: ['#6366F1', '#8B5CF6'] },
+        { id: 'rent', name: 'Rent', icon: 'home', color: colors.primary, gradient: isDark ? ['#818cf8', '#a78bfa'] : ['#6366F1', '#8B5CF6'] },
         { id: 'wifi', name: 'Wi-Fi', icon: 'wifi', color: '#10B981', gradient: ['#10B981', '#059669'] },
         { id: 'subscriptions', name: 'Subscriptions', icon: 'play', color: '#EC4899', gradient: ['#EC4899', '#DB2777'] },
         { id: 'water', name: 'Water', icon: 'water', color: '#06B6D4', gradient: ['#06B6D4', '#0891B2'] },
         { id: 'gas', name: 'Gas', icon: 'flame', color: '#EF4444', gradient: ['#EF4444', '#DC2626'] },
         { id: 'phone', name: 'Phone', icon: 'call', color: '#8B5CF6', gradient: ['#8B5CF6', '#7C3AED'] },
-        { id: 'other', name: 'Other', icon: 'ellipsis-horizontal', color: '#6B7280', gradient: ['#6B7280', '#4B5563'] },
+        { id: 'other', name: 'Other', icon: 'ellipsis-horizontal', color: colors.textTertiary, gradient: isDark ? ['#64748b', '#475569'] : ['#6B7280', '#4B5563'] },
     ];
 
     useEffect(() => {
@@ -189,7 +227,7 @@ const EditBill = () => {
             onPress={() => setAmount(quickAmount.toString())}
         >
             <LinearGradient
-                colors={['#6366F1', '#8B5CF6']}
+                colors={colors.gradient}
                 style={styles.quickAmountGradient}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
@@ -202,7 +240,7 @@ const EditBill = () => {
     if (isLoading) {
         return (
             <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#6366F1" />
+                <ActivityIndicator size="large" color={colors.primary} />
                 <Text style={styles.loadingText}>Loading bill...</Text>
             </View>
         );
@@ -229,7 +267,7 @@ const EditBill = () => {
                     onPress={() => router.back()}
                 >
                     <LinearGradient
-                        colors={['#6366F1', '#8B5CF6']}
+                        colors={colors.gradient}
                         style={styles.backButtonGradient}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 1 }}
@@ -265,7 +303,7 @@ const EditBill = () => {
                     <TextInput
                         style={styles.input}
                         placeholder="Electricity Bill, Netflix, etc."
-                        placeholderTextColor="#9CA3AF"
+                        placeholderTextColor={colors.textTertiary}
                         value={billName}
                         onChangeText={setBillName}
                     />
@@ -281,7 +319,7 @@ const EditBill = () => {
                         <TextInput
                             style={[styles.input, styles.amountInput]}
                             placeholder="0.00"
-                            placeholderTextColor="#9CA3AF"
+                            placeholderTextColor={colors.textTertiary}
                             keyboardType="decimal-pad"
                             value={amount}
                             onChangeText={(text) => setAmount(text.replace(/[^0-9.]/g, ''))}
@@ -350,7 +388,7 @@ const EditBill = () => {
                         onPress={() => setShowDatePicker(true)}
                     >
                         <LinearGradient
-                            colors={['#6366F1', '#8B5CF6']}
+                            colors={colors.gradient}
                             style={styles.dateIcon}
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 1 }}
@@ -360,14 +398,15 @@ const EditBill = () => {
                         <Text style={styles.dateText}>
                             {formatDate(dueDate)}
                         </Text>
-                        <Ionicons name="chevron-forward" size={16} color="#9CA3AF" />
+                        <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
                     </TouchableOpacity>
                     {showDatePicker && (
                         <DateTimePicker
                             value={dueDate}
                             mode="date"
-                            display="default"
+                            display={isDark ? "spinner" : "default"}
                             onChange={onDateChange}
+                            themeVariant={isDark ? "dark" : "light"}
                         />
                     )}
                 </View>
@@ -376,7 +415,7 @@ const EditBill = () => {
                 <View style={styles.switchGroup}>
                     <View style={styles.switchLabel}>
                         <LinearGradient
-                            colors={['#6366F1', '#8B5CF6']}
+                            colors={colors.gradient}
                             style={styles.switchIcon}
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 1 }}
@@ -396,7 +435,7 @@ const EditBill = () => {
                         onPress={() => setIsRecurring(!isRecurring)}
                     >
                         <LinearGradient
-                            colors={isRecurring ? ['#6366F1', '#8B5CF6'] : ['#D1D5DB', '#9CA3AF']}
+                            colors={isRecurring ? colors.gradient : isDark ? ['#475569', '#64748b'] : ['#D1D5DB', '#9CA3AF']}
                             style={[
                                 styles.toggleCircle,
                                 isRecurring && styles.toggleCircleActive
@@ -413,7 +452,7 @@ const EditBill = () => {
                     <TextInput
                         style={[styles.input, styles.textArea]}
                         placeholder="Add any additional notes..."
-                        placeholderTextColor="#9CA3AF"
+                        placeholderTextColor={colors.textTertiary}
                         value={notes}
                         onChangeText={setNotes}
                         multiline
@@ -432,7 +471,7 @@ const EditBill = () => {
                     disabled={!billName || !amount || !category || isSaving}
                 >
                     <LinearGradient
-                        colors={['#6366F1', '#8B5CF6']}
+                        colors={colors.gradient}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 1 }}
                         style={styles.buttonGradient}
@@ -454,7 +493,7 @@ const EditBill = () => {
                     onPress={handleDeleteBill}
                 >
                     <LinearGradient
-                        colors={['#EF4444', '#DC2626']}
+                        colors={colors.dangerGradient}
                         style={styles.deleteButtonGradient}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 1 }}
@@ -468,10 +507,10 @@ const EditBill = () => {
     );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors, isDark) => StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#f8fafc',
+        backgroundColor: colors.background,
     },
     scrollContent: {
         paddingBottom: 40,
@@ -480,12 +519,12 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: '#f8fafc',
+        backgroundColor: colors.background,
     },
     loadingText: {
         marginTop: 12,
         fontSize: 16,
-        color: '#6B7280',
+        color: colors.textSecondary,
         fontWeight: '500',
     },
     header: {
@@ -504,7 +543,7 @@ const styles = StyleSheet.create({
         borderRadius: 14,
         justifyContent: 'center',
         alignItems: 'center',
-        shadowColor: '#6366F1',
+        shadowColor: colors.primary,
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
         shadowRadius: 8,
@@ -519,13 +558,13 @@ const styles = StyleSheet.create({
     title: {
         fontSize: 32,
         fontWeight: '800',
-        color: '#1F2937',
+        color: colors.textPrimary,
         letterSpacing: -0.5,
         marginBottom: 4,
     },
     subtitle: {
         fontSize: 16,
-        color: '#6B7280',
+        color: colors.textSecondary,
         fontWeight: '500',
     },
     form: {
@@ -537,22 +576,22 @@ const styles = StyleSheet.create({
     label: {
         fontSize: 16,
         fontWeight: '700',
-        color: '#374151',
+        color: colors.textPrimary,
         marginBottom: 12,
     },
     required: {
-        color: '#EF4444',
+        color: colors.danger,
     },
     input: {
         borderWidth: 2,
-        borderColor: '#F3F4F6',
+        borderColor: isDark ? colors.border : '#F3F4F6',
         borderRadius: 16,
         padding: 18,
         fontSize: 16,
-        backgroundColor: '#fff',
-        color: '#1F2937',
+        backgroundColor: colors.surface,
+        color: colors.textPrimary,
         fontWeight: '500',
-        shadowColor: '#000',
+        shadowColor: colors.shadow,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.05,
         shadowRadius: 8,
@@ -564,7 +603,7 @@ const styles = StyleSheet.create({
     currencySymbol: {
         fontSize: 18,
         fontWeight: '700',
-        color: '#374151',
+        color: colors.textPrimary,
         position: 'absolute',
         left: 18,
         top: 18,
@@ -579,7 +618,7 @@ const styles = StyleSheet.create({
     quickAmountsLabel: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#6B7280',
+        color: colors.textSecondary,
         marginBottom: 12,
     },
     quickAmountsContainer: {
@@ -591,7 +630,7 @@ const styles = StyleSheet.create({
         flex: 1,
         borderRadius: 12,
         overflow: 'hidden',
-        shadowColor: '#6366F1',
+        shadowColor: colors.primary,
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
         shadowRadius: 8,
@@ -618,20 +657,20 @@ const styles = StyleSheet.create({
     categoryButton: {
         alignItems: 'center',
         padding: 12,
-        backgroundColor: '#fff',
+        backgroundColor: colors.surface,
         borderRadius: 16,
         borderWidth: 2,
-        borderColor: '#F3F4F6',
-        shadowColor: '#000',
+        borderColor: isDark ? colors.border : '#F3F4F6',
+        shadowColor: colors.shadow,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.05,
         shadowRadius: 8,
         elevation: 2,
     },
     categoryButtonActive: {
-        borderColor: '#6366F1',
-        backgroundColor: 'rgba(99, 102, 241, 0.05)',
-        shadowColor: '#6366F1',
+        borderColor: colors.primary,
+        backgroundColor: colors.primaryLight,
+        shadowColor: colors.primary,
         shadowOpacity: 0.2,
     },
     categoryIcon: {
@@ -641,34 +680,34 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 8,
-        shadowColor: '#000',
+        shadowColor: colors.shadow,
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.2,
         shadowRadius: 8,
         elevation: 4,
     },
     categoryIconActive: {
-        shadowColor: '#6366F1',
+        shadowColor: colors.primary,
         shadowOpacity: 0.4,
     },
     categoryText: {
         fontSize: 12,
         fontWeight: '600',
-        color: '#6B7280',
+        color: colors.textSecondary,
     },
     categoryTextActive: {
-        color: '#6366F1',
+        color: colors.primary,
         fontWeight: '700',
     },
     dateButton: {
         flexDirection: 'row',
         alignItems: 'center',
         borderWidth: 2,
-        borderColor: '#F3F4F6',
+        borderColor: isDark ? colors.border : '#F3F4F6',
         borderRadius: 16,
         padding: 18,
-        backgroundColor: '#fff',
-        shadowColor: '#000',
+        backgroundColor: colors.surface,
+        shadowColor: colors.shadow,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.05,
         shadowRadius: 8,
@@ -685,7 +724,7 @@ const styles = StyleSheet.create({
     dateText: {
         flex: 1,
         fontSize: 16,
-        color: '#1F2937',
+        color: colors.textPrimary,
         fontWeight: '500',
     },
     switchGroup: {
@@ -694,11 +733,11 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginBottom: 28,
         padding: 20,
-        backgroundColor: '#fff',
+        backgroundColor: colors.surface,
         borderRadius: 16,
         borderWidth: 2,
-        borderColor: '#F3F4F6',
-        shadowColor: '#000',
+        borderColor: isDark ? colors.border : '#F3F4F6',
+        shadowColor: colors.shadow,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.05,
         shadowRadius: 8,
@@ -720,12 +759,12 @@ const styles = StyleSheet.create({
     switchText: {
         fontSize: 16,
         fontWeight: '700',
-        color: '#374151',
+        color: colors.textPrimary,
         marginBottom: 2,
     },
     switchSubtitle: {
         fontSize: 14,
-        color: '#6B7280',
+        color: colors.textSecondary,
         fontWeight: '500',
     },
     toggle: {
@@ -734,9 +773,10 @@ const styles = StyleSheet.create({
         borderRadius: 16,
         padding: 2,
         justifyContent: 'center',
+        backgroundColor: isDark ? colors.surfaceSecondary : '#F3F4F6',
     },
     toggleActive: {
-        shadowColor: '#6366F1',
+        shadowColor: colors.primary,
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
         shadowRadius: 8,
@@ -746,7 +786,7 @@ const styles = StyleSheet.create({
         width: 28,
         height: 28,
         borderRadius: 14,
-        shadowColor: '#000',
+        shadowColor: colors.shadow,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
         shadowRadius: 4,
@@ -762,7 +802,7 @@ const styles = StyleSheet.create({
     button: {
         borderRadius: 20,
         marginBottom: 16,
-        shadowColor: '#6366F1',
+        shadowColor: colors.primary,
         shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.4,
         shadowRadius: 16,
@@ -789,11 +829,11 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         padding: 20,
-        backgroundColor: '#fff',
+        backgroundColor: colors.surface,
         borderRadius: 16,
         borderWidth: 2,
-        borderColor: '#FEF2F2',
-        shadowColor: '#000',
+        borderColor: isDark ? colors.border : '#FEF2F2',
+        shadowColor: colors.shadow,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.05,
         shadowRadius: 8,
@@ -810,7 +850,7 @@ const styles = StyleSheet.create({
     deleteButtonText: {
         fontSize: 16,
         fontWeight: '700',
-        color: '#EF4444',
+        color: colors.danger,
     },
 });
 

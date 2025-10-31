@@ -7,15 +7,53 @@ import { useAuth } from "../../contexts/AuthContext";
 import { useRouter } from "expo-router";
 import { db } from "../../firebase/config";
 import { collection, query, where, onSnapshot, orderBy } from "firebase/firestore";
+import { useTheme } from "../../contexts/ThemeContext";
 
 const { width, height } = Dimensions.get('window');
 
+// Theme colors
+const lightColors = {
+    background: '#f8fafc',
+    surface: '#ffffff',
+    textPrimary: '#1F2937',
+    textSecondary: '#6B7280',
+    textTertiary: '#9CA3AF',
+    border: '#E5E7EB',
+    primary: '#6366F1',
+    gradient: ['#6366F1', '#8B5CF6'],
+    success: '#10B981',
+    warning: '#F59E0B',
+    danger: '#EF4444',
+    shadow: '#000',
+    overlay: 'rgba(255,255,255,0.1)',
+};
+
+const darkColors = {
+    background: '#0f172a',
+    surface: '#1e293b',
+    textPrimary: '#f1f5f9',
+    textSecondary: '#cbd5e1',
+    textTertiary: '#64748b',
+    border: '#334155',
+    primary: '#818cf8',
+    gradient: ['#818cf8', '#a78bfa'],
+    success: '#34D399',
+    warning: '#FBBF24',
+    danger: '#F87171',
+    shadow: '#000',
+    overlay: 'rgba(255,255,255,0.1)',
+};
+
 const Dashboard = () => {
     const { user, logout } = useAuth();
+    const { isDark } = useTheme();
     const router = useRouter();
     const [bills, setBills] = useState([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+
+    const colors = isDark ? darkColors : lightColors;
+    const styles = createStyles(colors, isDark);
 
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(30)).current;
@@ -179,7 +217,7 @@ const Dashboard = () => {
         return "Good evening";
     };
 
-    const StatCard = ({ title, value, subtitle, icon, color, gradient }) => (
+    const StatCard = ({ title, value, subtitle, icon, gradient }) => (
         <Animated.View
             style={[
                 styles.statCard,
@@ -199,7 +237,7 @@ const Dashboard = () => {
                 end={{ x: 1, y: 1 }}
             >
                 <View style={styles.statHeader}>
-                    <View style={[styles.statIconContainer, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+                    <View style={[styles.statIconContainer, { backgroundColor: colors.overlay }]}>
                         <Ionicons name={icon} size={20} color="#fff" />
                     </View>
                     <View style={styles.statTrend}>
@@ -213,7 +251,7 @@ const Dashboard = () => {
         </Animated.View>
     );
 
-    const QuickAction = ({ title, icon, color, gradient, onPress }) => (
+    const QuickAction = ({ title, icon, gradient, onPress }) => (
         <TouchableOpacity onPress={onPress}>
             <Animated.View
                 style={[
@@ -243,13 +281,13 @@ const Dashboard = () => {
     const UpcomingBillItem = ({ bill, index }) => {
         const categoryColors = {
             electricity: '#F59E0B',
-            rent: '#6366F1',
+            rent: colors.primary,
             wifi: '#10B981',
             subscriptions: '#EC4899',
             water: '#06B6D4',
             gas: '#EF4444',
             phone: '#8B5CF6',
-            other: '#6B7280',
+            other: colors.textTertiary,
         };
 
         const getDaysUntilDue = (dueDate) => {
@@ -276,7 +314,7 @@ const Dashboard = () => {
                 ]}
             >
                 <View style={styles.billLeft}>
-                    <View style={[styles.billColorDot, { backgroundColor: categoryColors[bill.category] || '#6B7280' }]} />
+                    <View style={[styles.billColorDot, { backgroundColor: categoryColors[bill.category] || colors.textTertiary }]} />
                     <View style={styles.billInfo}>
                         <Text style={styles.billName}>{bill.name}</Text>
                         <Text style={[
@@ -306,8 +344,9 @@ const Dashboard = () => {
                     <RefreshControl
                         refreshing={refreshing}
                         onRefresh={onRefresh}
-                        colors={['#6366F1']}
-                        tintColor="#6366F1"
+                        colors={[colors.primary]}
+                        tintColor={colors.primary}
+                        progressBackgroundColor={colors.surface}
                     />
                 }
             >
@@ -319,7 +358,7 @@ const Dashboard = () => {
                     </View>
                     <TouchableOpacity style={styles.avatarContainer} onPress={handleLogout}>
                         <LinearGradient
-                            colors={['#6366F1', '#8B5CF6']}
+                            colors={colors.gradient}
                             style={styles.avatar}
                         >
                             <Text style={styles.avatarText}>{getUserInitial()}</Text>
@@ -334,7 +373,7 @@ const Dashboard = () => {
                         value={`$${stats.monthlySpending.toFixed(0)}`}
                         subtitle="This month"
                         icon="wallet-outline"
-                        gradient={['#6366F1', '#8B5CF6']}
+                        gradient={colors.gradient}
                     />
                     <StatCard
                         title="Upcoming"
@@ -374,7 +413,7 @@ const Dashboard = () => {
                         <QuickAction
                             title="Add Bill"
                             icon="add"
-                            gradient={['#6366F1', '#8B5CF6']}
+                            gradient={colors.gradient}
                             onPress={() => router.push('/(tabs)/add')}
                         />
                         <QuickAction
@@ -388,12 +427,6 @@ const Dashboard = () => {
                             icon="bar-chart"
                             gradient={['#F59E0B', '#FBBF24']}
                             onPress={() => router.push('/(tabs)/analytics')}
-                        />
-                        <QuickAction
-                            title="Split"
-                            icon="people"
-                            gradient={['#EC4899', '#F472B6']}
-                            onPress={() => router.push('/(tabs)/split')}
                         />
                     </View>
                 </Animated.View>
@@ -415,12 +448,12 @@ const Dashboard = () => {
                             onPress={() => router.push('/(tabs)/bills')}
                         >
                             <Text style={styles.seeAllText}>View All</Text>
-                            <Ionicons name="chevron-forward" size={16} color="#6366F1" />
+                            <Ionicons name="chevron-forward" size={16} color={colors.primary} />
                         </TouchableOpacity>
                     </View>
                     {upcomingBills.length === 0 ? (
                         <View style={styles.emptyState}>
-                            <Ionicons name="document-text-outline" size={48} color="#D1D5DB" />
+                            <Ionicons name="document-text-outline" size={48} color={colors.textTertiary} />
                             <Text style={styles.emptyTitle}>No upcoming bills</Text>
                             <Text style={styles.emptySubtitle}>All caught up! 🎉</Text>
                         </View>
@@ -444,7 +477,7 @@ const Dashboard = () => {
                     ]}
                 >
                     <LinearGradient
-                        colors={['#6366F1', '#8B5CF6']}
+                        colors={colors.gradient}
                         style={styles.profileCard}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 1 }}
@@ -484,10 +517,10 @@ const Dashboard = () => {
     );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors, isDark) => StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#f8fafc',
+        backgroundColor: colors.background,
     },
     scrollView: {
         flex: 1,
@@ -506,18 +539,18 @@ const styles = StyleSheet.create({
     },
     greeting: {
         fontSize: 16,
-        color: '#6B7280',
+        color: colors.textSecondary,
         fontWeight: '600',
         marginBottom: 4,
     },
     title: {
         fontSize: 28,
         fontWeight: '800',
-        color: '#1F2937',
+        color: colors.textPrimary,
         letterSpacing: -0.5,
     },
     avatarContainer: {
-        shadowColor: '#6366F1',
+        shadowColor: colors.primary,
         shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.3,
         shadowRadius: 12,
@@ -530,7 +563,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         borderWidth: 3,
-        borderColor: '#fff',
+        borderColor: colors.surface,
     },
     avatarText: {
         color: '#fff',
@@ -548,7 +581,7 @@ const styles = StyleSheet.create({
         flex: 1,
         minWidth: (width - 56) / 2,
         borderRadius: 20,
-        shadowColor: '#000',
+        shadowColor: colors.shadow,
         shadowOffset: { width: 0, height: 12 },
         shadowOpacity: 0.2,
         shadowRadius: 20,
@@ -607,7 +640,7 @@ const styles = StyleSheet.create({
     sectionTitle: {
         fontSize: 22,
         fontWeight: '800',
-        color: '#1F2937',
+        color: colors.textPrimary,
         letterSpacing: -0.5,
     },
     seeAllButton: {
@@ -615,12 +648,12 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingHorizontal: 12,
         paddingVertical: 6,
-        backgroundColor: 'rgba(99, 102, 241, 0.1)',
+        backgroundColor: isDark ? 'rgba(129, 140, 248, 0.1)' : 'rgba(99, 102, 241, 0.1)',
         borderRadius: 12,
     },
     seeAllText: {
         fontSize: 14,
-        color: '#6366F1',
+        color: colors.primary,
         fontWeight: '600',
         marginRight: 4,
     },
@@ -632,7 +665,7 @@ const styles = StyleSheet.create({
     quickAction: {
         flex: 1,
         alignItems: 'center',
-        minWidth: (width - 80) / 4, // Calculate width for 4 items
+        minWidth: (width - 80) / 4,
     },
     actionGradient: {
         width: 60,
@@ -641,7 +674,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 8,
-        shadowColor: '#000',
+        shadowColor: colors.shadow,
         shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.2,
         shadowRadius: 12,
@@ -650,13 +683,13 @@ const styles = StyleSheet.create({
     actionTitle: {
         fontSize: 12,
         fontWeight: '700',
-        color: '#374151',
+        color: colors.textPrimary,
         textAlign: 'center',
     },
     upcomingBillsList: {
-        backgroundColor: '#fff',
+        backgroundColor: colors.surface,
         borderRadius: 20,
-        shadowColor: '#000',
+        shadowColor: colors.shadow,
         shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.1,
         shadowRadius: 16,
@@ -669,7 +702,7 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         padding: 20,
         borderBottomWidth: 1,
-        borderBottomColor: 'rgba(0,0,0,0.05)',
+        borderBottomColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)',
     },
     billLeft: {
         flexDirection: 'row',
@@ -688,27 +721,27 @@ const styles = StyleSheet.create({
     billName: {
         fontSize: 16,
         fontWeight: '700',
-        color: '#1F2937',
+        color: colors.textPrimary,
         marginBottom: 4,
     },
     billDueDate: {
         fontSize: 14,
-        color: '#6B7280',
+        color: colors.textSecondary,
         fontWeight: '500',
     },
     overdueText: {
-        color: '#EF4444',
+        color: colors.danger,
         fontWeight: '600',
     },
     billAmount: {
         fontSize: 16,
         fontWeight: '800',
-        color: '#1F2937',
+        color: colors.textPrimary,
     },
     profileCard: {
         borderRadius: 24,
         padding: 24,
-        shadowColor: '#6366F1',
+        shadowColor: colors.primary,
         shadowOffset: { width: 0, height: 12 },
         shadowOpacity: 0.3,
         shadowRadius: 20,
@@ -727,7 +760,7 @@ const styles = StyleSheet.create({
         width: 56,
         height: 56,
         borderRadius: 28,
-        backgroundColor: 'rgba(255,255,255,0.2)',
+        backgroundColor: colors.overlay,
         justifyContent: 'center',
         alignItems: 'center',
         marginRight: 16,
@@ -761,7 +794,7 @@ const styles = StyleSheet.create({
         fontSize: 12,
         color: 'rgba(255,255,255,0.7)',
         fontWeight: '600',
-        backgroundColor: 'rgba(255,255,255,0.1)',
+        backgroundColor: colors.overlay,
         paddingHorizontal: 8,
         paddingVertical: 4,
         borderRadius: 8,
@@ -770,16 +803,16 @@ const styles = StyleSheet.create({
         width: 44,
         height: 44,
         borderRadius: 22,
-        backgroundColor: 'rgba(255,255,255,0.2)',
+        backgroundColor: colors.overlay,
         justifyContent: 'center',
         alignItems: 'center',
     },
     emptyState: {
-        backgroundColor: '#fff',
+        backgroundColor: colors.surface,
         padding: 40,
         borderRadius: 20,
         alignItems: 'center',
-        shadowColor: '#000',
+        shadowColor: colors.shadow,
         shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.1,
         shadowRadius: 16,
@@ -788,13 +821,13 @@ const styles = StyleSheet.create({
     emptyTitle: {
         fontSize: 16,
         fontWeight: '700',
-        color: '#374151',
+        color: colors.textPrimary,
         marginTop: 12,
         marginBottom: 4,
     },
     emptySubtitle: {
         fontSize: 14,
-        color: '#6B7280',
+        color: colors.textSecondary,
         textAlign: 'center',
     },
     bottomPadding: {

@@ -3,22 +3,56 @@ import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from 'expo-linear-gradient';
 import { View, StyleSheet, Dimensions } from "react-native";
+import { useTheme } from '../../contexts/ThemeContext';
 
 const { width } = Dimensions.get('window');
 
+// Theme colors
+const lightColors = {
+    tabBarBackground: 'rgba(255, 255, 255, 0.95)',
+    tabBarBorder: '#E5E7EB',
+    textPrimary: '#6366F1',
+    textSecondary: '#94A3B8',
+    surface: '#ffffff',
+    gradient: ['#6366F1', '#8B5CF6'],
+    shadow: '#6366F1',
+    activeDot: '#6366F1',
+    addButtonBorder: '#fff',
+    addButtonGlow: 'rgba(99, 102, 241, 0.2)',
+};
+
+const darkColors = {
+    tabBarBackground: 'rgba(30, 41, 59, 0.95)',
+    tabBarBorder: '#334155',
+    textPrimary: '#818cf8',
+    textSecondary: '#64748b',
+    surface: '#1e293b',
+    gradient: ['#818cf8', '#a78bfa'],
+    shadow: '#818cf8',
+    activeDot: '#818cf8',
+    addButtonBorder: '#1e293b',
+    addButtonGlow: 'rgba(129, 140, 248, 0.2)',
+};
+
 const TabsLayout = () => {
+    const { isDark } = useTheme();
+    const colors = isDark ? darkColors : lightColors;
+
+    const styles = createStyles(colors, isDark);
+
     return (
         <Tabs
             screenOptions={{
-                tabBarActiveTintColor: '#6366F1',
-                tabBarInactiveTintColor: '#94A3B8',
+                tabBarActiveTintColor: colors.textPrimary,
+                tabBarInactiveTintColor: colors.textSecondary,
                 tabBarStyle: {
-                    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                    borderTopWidth: 0,
+                    backgroundColor: colors.tabBarBackground,
+                    borderTopWidth: 1,
+                    borderTopColor: colors.tabBarBorder,
                     height: 90,
                     paddingBottom: 25,
                     paddingTop: 12,
-                    shadowColor: '#6366F1',
+                    shadowColor: colors.shadow,
                     shadowOffset: { width: 0, height: -8 },
                     shadowOpacity: 0.12,
                     shadowRadius: 20,
@@ -39,8 +73,9 @@ const TabsLayout = () => {
                     fontWeight: '700',
                     marginTop: 6,
                     letterSpacing: -0.2,
+                    color: colors.textSecondary,
                 },
-                headerShown: false, // This removes headers for all screens
+                headerShown: false,
             }}
         >
             <Tabs.Screen
@@ -91,7 +126,7 @@ const TabsLayout = () => {
                     title: 'Add',
                     tabBarIcon: ({ color, size, focused }) => (
                         <LinearGradient
-                            colors={['#6366F1', '#8B5CF6']}
+                            colors={colors.gradient}
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 1 }}
                             style={[
@@ -134,9 +169,9 @@ const TabsLayout = () => {
                 }}
             />
             <Tabs.Screen
-                name="split"
+                name="settings"
                 options={{
-                    title: 'Split',
+                    title: 'Settings',
                     tabBarIcon: ({ color, size, focused }) => (
                         <View style={focused ? styles.iconContainerFocused : styles.iconContainer}>
                             <View style={[
@@ -144,7 +179,7 @@ const TabsLayout = () => {
                                 focused && styles.iconInnerFocused
                             ]}>
                                 <Ionicons
-                                    name={focused ? "people" : "people-outline"}
+                                    name={focused ? "settings" : "settings-outline"}
                                     size={focused ? 22 : 20}
                                     color={focused ? '#fff' : color}
                                 />
@@ -154,24 +189,9 @@ const TabsLayout = () => {
                     ),
                 }}
             />
-            <Tabs.Screen
-                name="settings"
-                options={{
-                    title: 'Settings',
-                    tabBarIcon: ({ color, size }) => (
-                        <Ionicons name="settings" size={size} color={color} />
-                    ),
-                }}
-            />
-            {/* Hide edit-bill and group details from tab bar */}
+            {/* Hide edit-bill from tab bar */}
             <Tabs.Screen
                 name="edit-bill"
-                options={{
-                    href: null,
-                }}
-            />
-            <Tabs.Screen
-                name="group-details"
                 options={{
                     href: null,
                 }}
@@ -180,10 +200,10 @@ const TabsLayout = () => {
     );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors, isDark) => StyleSheet.create({
     tabBarBackground: {
         flex: 1,
-        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+        backgroundColor: colors.tabBarBackground,
         borderTopLeftRadius: 24,
         borderTopRightRadius: 24,
         overflow: 'hidden',
@@ -207,8 +227,8 @@ const styles = StyleSheet.create({
         backgroundColor: 'transparent',
     },
     iconInnerFocused: {
-        backgroundColor: '#6366F1',
-        shadowColor: '#6366F1',
+        backgroundColor: colors.textPrimary,
+        shadowColor: colors.shadow,
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
         shadowRadius: 8,
@@ -218,7 +238,7 @@ const styles = StyleSheet.create({
         width: 4,
         height: 4,
         borderRadius: 2,
-        backgroundColor: '#6366F1',
+        backgroundColor: colors.activeDot,
         marginTop: 4,
     },
     addButton: {
@@ -228,17 +248,17 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         marginTop: -30,
-        shadowColor: '#6366F1',
+        shadowColor: colors.shadow,
         shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.4,
         shadowRadius: 16,
         elevation: 12,
         borderWidth: 3,
-        borderColor: '#fff',
+        borderColor: colors.addButtonBorder,
     },
     addButtonFocused: {
         transform: [{ scale: 1.05 }],
-        shadowColor: '#8B5CF6',
+        shadowColor: colors.gradient[1],
         shadowOpacity: 0.6,
     },
     addButtonGlow: {
@@ -246,7 +266,7 @@ const styles = StyleSheet.create({
         width: 70,
         height: 70,
         borderRadius: 35,
-        backgroundColor: 'rgba(99, 102, 241, 0.2)',
+        backgroundColor: colors.addButtonGlow,
         zIndex: -1,
     },
 });

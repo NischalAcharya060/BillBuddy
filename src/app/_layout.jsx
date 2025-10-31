@@ -3,6 +3,7 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { AuthProvider, useAuth } from "../contexts/AuthContext";
 import { ActivityIndicator, View } from "react-native";
+import { ThemeProvider } from '../contexts/ThemeContext';
 
 function RootLayoutNav() {
     const { loading } = useAuth();
@@ -68,8 +69,10 @@ function RootLayoutNav() {
 
 export default function RootLayout() {
     return (
-        <AuthProvider>
-            <RootLayoutNav />
-        </AuthProvider>
+        <ThemeProvider>
+            <AuthProvider>
+                <RootLayoutNav />
+            </AuthProvider>
+        </ThemeProvider>
     );
 }

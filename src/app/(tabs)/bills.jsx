@@ -7,11 +7,50 @@ import { useAuth } from "../../contexts/AuthContext";
 import { db } from "../../firebase/config";
 import { collection, query, where, onSnapshot, orderBy, updateDoc, doc, deleteDoc } from "firebase/firestore";
 import { useRouter } from "expo-router";
+import { useTheme } from "../../contexts/ThemeContext";
 
 const { width, height } = Dimensions.get('window');
 
+// Theme colors
+const lightColors = {
+    background: '#f8fafc',
+    surface: '#ffffff',
+    surfaceSecondary: '#f9fafb',
+    textPrimary: '#1F2937',
+    textSecondary: '#6B7280',
+    textTertiary: '#9CA3AF',
+    border: '#E5E7EB',
+    primary: '#6366F1',
+    primaryLight: 'rgba(99, 102, 241, 0.1)',
+    shadow: '#000',
+    disabled: '#F9FAFB',
+    success: '#10B981',
+    warning: '#F59E0B',
+    danger: '#EF4444',
+    overlay: 'rgba(0,0,0,0.5)',
+};
+
+const darkColors = {
+    background: '#0f172a',
+    surface: '#1e293b',
+    surfaceSecondary: '#334155',
+    textPrimary: '#f1f5f9',
+    textSecondary: '#cbd5e1',
+    textTertiary: '#64748b',
+    border: '#334155',
+    primary: '#818cf8',
+    primaryLight: 'rgba(129, 140, 248, 0.1)',
+    shadow: '#000',
+    disabled: '#1e293b',
+    success: '#34D399',
+    warning: '#FBBF24',
+    danger: '#F87171',
+    overlay: 'rgba(0,0,0,0.7)',
+};
+
 const Bills = () => {
     const { user } = useAuth();
+    const { isDark } = useTheme();
     const router = useRouter();
     const [bills, setBills] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -21,19 +60,22 @@ const Bills = () => {
     const [editModalVisible, setEditModalVisible] = useState(false);
     const [selectedBill, setSelectedBill] = useState(null);
 
+    const colors = isDark ? darkColors : lightColors;
+    const styles = createStyles(colors, isDark);
+
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(30)).current;
     const scaleAnim = useRef(new Animated.Value(0.95)).current;
 
     const categories = {
         electricity: { name: 'Electricity', icon: 'flash', color: '#F59E0B', gradient: ['#F59E0B', '#D97706'] },
-        rent: { name: 'Rent', icon: 'home', color: '#6366F1', gradient: ['#6366F1', '#8B5CF6'] },
+        rent: { name: 'Rent', icon: 'home', color: colors.primary, gradient: isDark ? ['#818cf8', '#a78bfa'] : ['#6366F1', '#8B5CF6'] },
         wifi: { name: 'Wi-Fi', icon: 'wifi', color: '#10B981', gradient: ['#10B981', '#059669'] },
         subscriptions: { name: 'Subscriptions', icon: 'play', color: '#EC4899', gradient: ['#EC4899', '#DB2777'] },
         water: { name: 'Water', icon: 'water', color: '#06B6D4', gradient: ['#06B6D4', '#0891B2'] },
         gas: { name: 'Gas', icon: 'flame', color: '#EF4444', gradient: ['#EF4444', '#DC2626'] },
         phone: { name: 'Phone', icon: 'call', color: '#8B5CF6', gradient: ['#8B5CF6', '#7C3AED'] },
-        other: { name: 'Other', icon: 'ellipsis-horizontal', color: '#6B7280', gradient: ['#6B7280', '#4B5563'] },
+        other: { name: 'Other', icon: 'ellipsis-horizontal', color: colors.textTertiary, gradient: isDark ? ['#64748b', '#475569'] : ['#6B7280', '#4B5563'] },
     };
 
     const filters = [
@@ -196,10 +238,10 @@ const Bills = () => {
 
     const getStatusColor = (status) => {
         switch (status) {
-            case 'paid': return '#10B981';
-            case 'overdue': return '#EF4444';
-            case 'pending': return '#F59E0B';
-            default: return '#6B7280';
+            case 'paid': return colors.success;
+            case 'overdue': return colors.danger;
+            case 'pending': return colors.warning;
+            default: return colors.textTertiary;
         }
     };
 
@@ -208,7 +250,7 @@ const Bills = () => {
             case 'paid': return ['#10B981', '#059669'];
             case 'overdue': return ['#EF4444', '#DC2626'];
             case 'pending': return ['#F59E0B', '#D97706'];
-            default: return ['#6B7280', '#4B5563'];
+            default: return isDark ? ['#64748b', '#475569'] : ['#6B7280', '#4B5563'];
         }
     };
 
@@ -283,7 +325,7 @@ const Bills = () => {
 
                 <View style={styles.billFooter}>
                     <View style={styles.dateContainer}>
-                        <Ionicons name="calendar-outline" size={14} color="#6B7280" />
+                        <Ionicons name="calendar-outline" size={14} color={colors.textSecondary} />
                         <Text style={[
                             styles.dueDate,
                             isOverdue && styles.overdueDate
@@ -320,7 +362,7 @@ const Bills = () => {
                                 <Ionicons
                                     name={item.status === 'paid' ? "checkmark-circle" : "ellipsis-horizontal"}
                                     size={22}
-                                    color={item.status === 'paid' ? "#10B981" : "#6B7280"}
+                                    color={item.status === 'paid' ? colors.success : colors.textSecondary}
                                 />
                             </TouchableOpacity>
 
@@ -331,7 +373,7 @@ const Bills = () => {
                                 <Ionicons
                                     name="ellipsis-vertical"
                                     size={18}
-                                    color="#6B7280"
+                                    color={colors.textSecondary}
                                 />
                             </TouchableOpacity>
                         </View>
@@ -340,7 +382,7 @@ const Bills = () => {
 
                 {item.isRecurring && (
                     <LinearGradient
-                        colors={['#6366F1', '#8B5CF6']}
+                        colors={isDark ? ['#818cf8', '#a78bfa'] : ['#6366F1', '#8B5CF6']}
                         style={styles.recurringBadge}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 1 }}
@@ -363,9 +405,9 @@ const Bills = () => {
             .reduce((sum, bill) => sum + bill.amount, 0);
 
         const stats = [
-            { value: totalBills, label: 'Total', color: '#6366F1', icon: 'documents' },
-            { value: paidBills, label: 'Paid', color: '#10B981', icon: 'checkmark-circle' },
-            { value: pendingBills, label: 'Pending', color: '#F59E0B', icon: 'time' },
+            { value: totalBills, label: 'Total', color: colors.primary, icon: 'documents' },
+            { value: paidBills, label: 'Paid', color: colors.success, icon: 'checkmark-circle' },
+            { value: pendingBills, label: 'Pending', color: colors.warning, icon: 'time' },
             { value: `$${pendingAmount.toFixed(0)}`, label: 'Due', color: '#EC4899', icon: 'cash' },
         ];
 
@@ -381,7 +423,7 @@ const Bills = () => {
             >
                 {stats.map((stat, index) => (
                     <View key={stat.label} style={styles.statItem}>
-                        <View style={[styles.statIconContainer, { backgroundColor: `${stat.color}20` }]}>
+                        <View style={[styles.statIconContainer, { backgroundColor: isDark ? `${stat.color}20` : `${stat.color}15` }]}>
                             <Ionicons name={stat.icon} size={16} color={stat.color} />
                         </View>
                         <Text style={[styles.statValue, { color: stat.color }]}>
@@ -409,7 +451,7 @@ const Bills = () => {
                             style={styles.closeButton}
                             onPress={() => setEditModalVisible(false)}
                         >
-                            <Ionicons name="close" size={24} color="#6B7280" />
+                            <Ionicons name="close" size={24} color={colors.textSecondary} />
                         </TouchableOpacity>
                     </View>
 
@@ -439,7 +481,7 @@ const Bills = () => {
                             onPress={() => handleEditBill(selectedBill)}
                         >
                             <LinearGradient
-                                colors={['#6366F1', '#8B5CF6']}
+                                colors={isDark ? ['#818cf8', '#a78bfa'] : ['#6366F1', '#8B5CF6']}
                                 style={styles.modalButtonIcon}
                                 start={{ x: 0, y: 0 }}
                                 end={{ x: 1, y: 1 }}
@@ -482,7 +524,7 @@ const Bills = () => {
                     </View>
                 </View>
                 <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color="#6366F1" />
+                    <ActivityIndicator size="large" color={colors.primary} />
                     <Text style={styles.loadingText}>Loading your bills...</Text>
                 </View>
             </View>
@@ -514,7 +556,7 @@ const Bills = () => {
                         setSortBy(sortOrder[nextIndex]);
                     }}
                 >
-                    <Ionicons name="filter" size={24} color="#6366F1" />
+                    <Ionicons name="filter" size={24} color={colors.primary} />
                 </TouchableOpacity>
             </Animated.View>
 
@@ -548,7 +590,7 @@ const Bills = () => {
                             <Ionicons
                                 name={filterItem.icon}
                                 size={16}
-                                color={filter === filterItem.id ? '#fff' : '#6B7280'}
+                                color={filter === filterItem.id ? '#fff' : colors.textSecondary}
                             />
                             <Text style={[
                                 styles.filterText,
@@ -561,7 +603,7 @@ const Bills = () => {
                 </ScrollView>
 
                 <View style={styles.sortInfo}>
-                    <Ionicons name={sortOptions.find(opt => opt.id === sortBy)?.icon || 'swap-vertical'} size={14} color="#6366F1" />
+                    <Ionicons name={sortOptions.find(opt => opt.id === sortBy)?.icon || 'swap-vertical'} size={14} color={colors.primary} />
                     <Text style={styles.sortText}>
                         {sortOptions.find(opt => opt.id === sortBy)?.name}
                     </Text>
@@ -579,7 +621,7 @@ const Bills = () => {
                         }
                     ]}
                 >
-                    <Ionicons name="document-text-outline" size={64} color="#D1D5DB" />
+                    <Ionicons name="document-text-outline" size={64} color={colors.textTertiary} />
                     <Text style={styles.emptyTitle}>
                         {bills.length === 0 ? "No bills yet" : "No bills found"}
                     </Text>
@@ -610,8 +652,9 @@ const Bills = () => {
                         <RefreshControl
                             refreshing={refreshing}
                             onRefresh={onRefresh}
-                            colors={['#6366F1']}
-                            tintColor="#6366F1"
+                            colors={[colors.primary]}
+                            tintColor={colors.primary}
+                            progressBackgroundColor={colors.surface}
                         />
                     }
                 />
@@ -623,10 +666,10 @@ const Bills = () => {
     );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors, isDark) => StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#f8fafc',
+        backgroundColor: colors.background,
     },
     header: {
         flexDirection: 'row',
@@ -639,27 +682,27 @@ const styles = StyleSheet.create({
     title: {
         fontSize: 32,
         fontWeight: '800',
-        color: '#1F2937',
+        color: colors.textPrimary,
         letterSpacing: -0.5,
     },
     subtitle: {
         fontSize: 16,
-        color: '#6B7280',
+        color: colors.textSecondary,
         fontWeight: '500',
     },
     filterButton: {
         padding: 12,
-        backgroundColor: 'rgba(99, 102, 241, 0.1)',
+        backgroundColor: colors.primaryLight,
         borderRadius: 12,
     },
     statsContainer: {
         flexDirection: 'row',
-        backgroundColor: '#fff',
+        backgroundColor: colors.surface,
         marginHorizontal: 20,
         marginVertical: 8,
         padding: 20,
         borderRadius: 24,
-        shadowColor: '#000',
+        shadowColor: colors.shadow,
         shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.1,
         shadowRadius: 20,
@@ -684,7 +727,7 @@ const styles = StyleSheet.create({
     },
     statLabel: {
         fontSize: 12,
-        color: '#6B7280',
+        color: colors.textSecondary,
         fontWeight: '600',
     },
     filtersContainer: {
@@ -699,27 +742,27 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingHorizontal: 16,
         paddingVertical: 10,
-        backgroundColor: '#fff',
+        backgroundColor: colors.surface,
         borderRadius: 20,
         borderWidth: 1,
-        borderColor: '#E5E7EB',
+        borderColor: colors.border,
         marginRight: 8,
-        shadowColor: '#000',
+        shadowColor: colors.shadow,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.05,
         shadowRadius: 4,
         elevation: 2,
     },
     filterChipActive: {
-        backgroundColor: '#6366F1',
-        borderColor: '#6366F1',
-        shadowColor: '#6366F1',
+        backgroundColor: colors.primary,
+        borderColor: colors.primary,
+        shadowColor: colors.primary,
         shadowOpacity: 0.2,
     },
     filterText: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#6B7280',
+        color: colors.textSecondary,
         marginLeft: 6,
     },
     filterTextActive: {
@@ -732,13 +775,13 @@ const styles = StyleSheet.create({
         marginTop: 12,
         paddingHorizontal: 12,
         paddingVertical: 8,
-        backgroundColor: 'rgba(99, 102, 241, 0.1)',
+        backgroundColor: colors.primaryLight,
         borderRadius: 12,
     },
     sortText: {
         fontSize: 12,
         fontWeight: '700',
-        color: '#6366F1',
+        color: colors.primary,
         marginLeft: 4,
     },
     flatList: {
@@ -747,14 +790,14 @@ const styles = StyleSheet.create({
     listContent: {
         paddingHorizontal: 20,
         paddingTop: 8,
-        paddingBottom: 30, // Added padding for better scrolling
+        paddingBottom: 30,
     },
     billCard: {
-        backgroundColor: '#fff',
+        backgroundColor: colors.surface,
         padding: 20,
         borderRadius: 20,
         marginBottom: 12,
-        shadowColor: '#000',
+        shadowColor: colors.shadow,
         shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.1,
         shadowRadius: 16,
@@ -779,7 +822,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         marginRight: 12,
-        shadowColor: '#000',
+        shadowColor: colors.shadow,
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.2,
         shadowRadius: 8,
@@ -791,18 +834,18 @@ const styles = StyleSheet.create({
     billName: {
         fontSize: 18,
         fontWeight: '700',
-        color: '#1F2937',
+        color: colors.textPrimary,
         marginBottom: 4,
     },
     billCategory: {
         fontSize: 14,
-        color: '#6B7280',
+        color: colors.textSecondary,
         fontWeight: '500',
     },
     billAmount: {
         fontSize: 20,
         fontWeight: '800',
-        color: '#1F2937',
+        color: colors.textPrimary,
     },
     billFooter: {
         flexDirection: 'row',
@@ -816,12 +859,12 @@ const styles = StyleSheet.create({
     },
     dueDate: {
         fontSize: 14,
-        color: '#6B7280',
+        color: colors.textSecondary,
         fontWeight: '500',
         marginLeft: 6,
     },
     overdueDate: {
-        color: '#EF4444',
+        color: colors.danger,
         fontWeight: '600',
     },
     actions: {
@@ -839,7 +882,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 10,
         paddingVertical: 6,
         borderRadius: 12,
-        shadowColor: '#000',
+        shadowColor: colors.shadow,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
         shadowRadius: 4,
@@ -854,16 +897,16 @@ const styles = StyleSheet.create({
     payButton: {
         padding: 8,
         borderRadius: 10,
-        backgroundColor: '#F8FAFC',
+        backgroundColor: isDark ? colors.surfaceSecondary : '#F8FAFC',
         marginRight: 8,
     },
     paidButton: {
-        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+        backgroundColor: isDark ? 'rgba(52, 211, 153, 0.1)' : 'rgba(16, 185, 129, 0.1)',
     },
     editButton: {
         padding: 8,
         borderRadius: 10,
-        backgroundColor: '#F8FAFC',
+        backgroundColor: isDark ? colors.surfaceSecondary : '#F8FAFC',
     },
     recurringBadge: {
         position: 'absolute',
@@ -874,7 +917,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 10,
         paddingVertical: 4,
         borderRadius: 12,
-        shadowColor: '#6366F1',
+        shadowColor: colors.primary,
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
         shadowRadius: 8,
@@ -891,28 +934,28 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         paddingHorizontal: 40,
-        paddingBottom: 100, // Added padding to center it better
+        paddingBottom: 100,
     },
     emptyTitle: {
         fontSize: 20,
         fontWeight: '700',
-        color: '#374151',
+        color: colors.textPrimary,
         marginTop: 16,
         marginBottom: 8,
     },
     emptySubtitle: {
         fontSize: 16,
-        color: '#6B7280',
+        color: colors.textSecondary,
         textAlign: 'center',
         lineHeight: 22,
     },
     addFirstBillButton: {
         marginTop: 20,
-        backgroundColor: '#6366F1',
+        backgroundColor: colors.primary,
         paddingHorizontal: 24,
         paddingVertical: 14,
         borderRadius: 16,
-        shadowColor: '#6366F1',
+        shadowColor: colors.primary,
         shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.3,
         shadowRadius: 16,
@@ -931,22 +974,22 @@ const styles = StyleSheet.create({
     loadingText: {
         marginTop: 12,
         fontSize: 16,
-        color: '#6B7280',
+        color: colors.textSecondary,
         fontWeight: '500',
     },
     // Modal Styles
     modalOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        backgroundColor: colors.overlay,
         justifyContent: 'flex-end',
     },
     modalContent: {
-        backgroundColor: '#fff',
+        backgroundColor: colors.surface,
         borderTopLeftRadius: 28,
         borderTopRightRadius: 28,
         padding: 24,
         paddingBottom: 40,
-        shadowColor: '#000',
+        shadowColor: colors.shadow,
         shadowOffset: { width: 0, height: -8 },
         shadowOpacity: 0.1,
         shadowRadius: 20,
@@ -961,17 +1004,17 @@ const styles = StyleSheet.create({
     modalTitle: {
         fontSize: 24,
         fontWeight: '800',
-        color: '#1F2937',
+        color: colors.textPrimary,
     },
     closeButton: {
         padding: 8,
-        backgroundColor: '#F3F4F6',
+        backgroundColor: isDark ? colors.surfaceSecondary : '#F3F4F6',
         borderRadius: 12,
     },
     billPreview: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#F8FAFC',
+        backgroundColor: isDark ? colors.surfaceSecondary : '#F8FAFC',
         padding: 20,
         borderRadius: 16,
         marginBottom: 24,
@@ -983,18 +1026,18 @@ const styles = StyleSheet.create({
     billPreviewName: {
         fontSize: 18,
         fontWeight: '700',
-        color: '#1F2937',
+        color: colors.textPrimary,
         marginBottom: 4,
     },
     billPreviewAmount: {
         fontSize: 20,
         fontWeight: '800',
-        color: '#6366F1',
+        color: colors.primary,
         marginBottom: 4,
     },
     billPreviewDue: {
         fontSize: 14,
-        color: '#6B7280',
+        color: colors.textSecondary,
         fontWeight: '500',
     },
     modalActions: {
@@ -1005,7 +1048,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         padding: 20,
         borderRadius: 16,
-        backgroundColor: '#F8FAFC',
+        backgroundColor: isDark ? colors.surfaceSecondary : '#F8FAFC',
     },
     modalButtonIcon: {
         width: 44,
@@ -1018,7 +1061,7 @@ const styles = StyleSheet.create({
     modalButtonText: {
         fontSize: 16,
         fontWeight: '700',
-        color: '#1F2937',
+        color: colors.textPrimary,
     },
     bottomPadding: {
         height: 40,
