@@ -313,7 +313,6 @@ const ProfileTab = ({ user, onProfileUpdate, isDark }) => {
     const [profileData, setProfileData] = useState({
         displayName: '',
         email: '',
-        phone: '',
     });
     const [loading, setLoading] = useState(false);
 
@@ -322,7 +321,6 @@ const ProfileTab = ({ user, onProfileUpdate, isDark }) => {
             setProfileData({
                 displayName: user.displayName || '',
                 email: user.email || '',
-                phone: user.phoneNumber || '',
             });
         }
     }, [user]);
@@ -373,19 +371,6 @@ const ProfileTab = ({ user, onProfileUpdate, isDark }) => {
                 <Text style={styles.helperText}>
                     Email cannot be changed
                 </Text>
-            </View>
-
-            <View style={styles.inputGroup}>
-                <Text style={styles.label}>Phone Number</Text>
-                <TextInput
-                    style={styles.input}
-                    placeholder="Enter your phone number"
-                    placeholderTextColor={isDark ? darkColors.textTertiary : lightColors.textTertiary}
-                    value={profileData.phone}
-                    onChangeText={(text) => setProfileData(prev => ({ ...prev, phone: text }))}
-                    keyboardType="phone-pad"
-                    returnKeyType="done"
-                />
             </View>
 
             <TouchableOpacity
@@ -540,24 +525,6 @@ const AppearanceTab = ({ isDark, onThemeChange }) => {
 
             <View style={styles.settingItem}>
                 <View style={styles.settingInfo}>
-                    <Ionicons name="notifications-outline" size={24} color={isDark ? darkColors.primary : lightColors.primary} />
-                    <View style={styles.settingText}>
-                        <Text style={styles.settingTitle}>Push Notifications</Text>
-                        <Text style={styles.settingDescription}>
-                            Receive notifications for expenses and settlements
-                        </Text>
-                    </View>
-                </View>
-                <Switch
-                    value={appearance.notifications}
-                    onValueChange={handleNotificationsChange}
-                    trackColor={{ false: isDark ? '#374151' : '#E5E7EB', true: '#A5B4FC' }}
-                    thumbColor={appearance.notifications ? (isDark ? darkColors.primary : lightColors.primary) : (isDark ? '#4B5563' : '#9CA3AF')}
-                />
-            </View>
-
-            <View style={styles.settingItem}>
-                <View style={styles.settingInfo}>
                     <Ionicons name="cash-outline" size={24} color={isDark ? darkColors.primary : lightColors.primary} />
                     <View style={styles.settingText}>
                         <Text style={styles.settingTitle}>Currency</Text>
@@ -638,12 +605,11 @@ const Settings = () => {
     const handleProfileUpdate = async (profileData) => {
         return await updateUserProfile({
             displayName: profileData.displayName.trim(),
-            phone: profileData.phone,
         });
     };
 
     const handleThemeChange = (theme) => {
-        setTheme(theme); // Use the setTheme function from context
+        setTheme(theme);
     };
 
     return (
