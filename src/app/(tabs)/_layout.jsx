@@ -154,6 +154,15 @@ const TabsLayout = () => {
                     ),
                 }}
             />
+            <Tabs.Screen
+                name="settings"
+                options={{
+                    title: 'Settings',
+                    tabBarIcon: ({ color, size }) => (
+                        <Ionicons name="settings" size={size} color={color} />
+                    ),
+                }}
+            />
             {/* Hide edit-bill and group details from tab bar */}
             <Tabs.Screen
                 name="edit-bill"

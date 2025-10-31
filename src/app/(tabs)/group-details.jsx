@@ -24,6 +24,167 @@ import { collection, query, where, onSnapshot, addDoc, serverTimestamp, doc, upd
 
 const { width } = Dimensions.get('window');
 
+// Separate AddExpenseModal component to prevent re-renders
+const AddExpenseModal = ({ visible, onClose, onAdd, members, user }) => {
+    const [newExpense, setNewExpense] = useState({
+        description: '',
+        amount: '',
+        paidBy: user?.email || '',
+        splitBetween: []
+    });
+
+    const toggleSplitMember = (member) => {
+        setNewExpense(prev => {
+            const isSelected = prev.splitBetween.includes(member);
+            if (isSelected) {
+                return {
+                    ...prev,
+                    splitBetween: prev.splitBetween.filter(m => m !== member)
+                };
+            } else {
+                return {
+                    ...prev,
+                    splitBetween: [...prev.splitBetween, member]
+                };
+            }
+        });
+    };
+
+    const handleAdd = () => {
+        onAdd(newExpense);
+    };
+
+    const handleClose = () => {
+        setNewExpense({
+            description: '',
+            amount: '',
+            paidBy: user?.email || '',
+            splitBetween: []
+        });
+        onClose();
+    };
+
+    return (
+        <Modal
+            animationType="slide"
+            transparent={true}
+            visible={visible}
+            onRequestClose={handleClose}
+        >
+            <View style={styles.modalOverlay}>
+                <View style={styles.modalContent}>
+                    <View style={styles.modalHeader}>
+                        <Text style={styles.modalTitle}>Add Expense</Text>
+                        <TouchableOpacity
+                            style={styles.closeButton}
+                            onPress={handleClose}
+                        >
+                            <Ionicons name="close" size={24} color="#6B7280" />
+                        </TouchableOpacity>
+                    </View>
+
+                    <ScrollView
+                        style={styles.modalScroll}
+                        keyboardShouldPersistTaps="handled"
+                    >
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.label}>Description</Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholder="e.g., Dinner, Groceries, Rent"
+                                value={newExpense.description}
+                                onChangeText={(text) => setNewExpense(prev => ({ ...prev, description: text }))}
+                                returnKeyType="next"
+                            />
+                        </View>
+
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.label}>Amount</Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholder="0.00"
+                                value={newExpense.amount}
+                                onChangeText={(text) => setNewExpense(prev => ({ ...prev, amount: text }))}
+                                keyboardType="decimal-pad"
+                                returnKeyType="next"
+                            />
+                        </View>
+
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.label}>Paid By</Text>
+                            <View style={styles.paidByContainer}>
+                                {members.map((member) => (
+                                    <TouchableOpacity
+                                        key={member}
+                                        style={[
+                                            styles.paidByOption,
+                                            newExpense.paidBy === member && styles.paidByOptionSelected
+                                        ]}
+                                        onPress={() => setNewExpense(prev => ({ ...prev, paidBy: member }))}
+                                    >
+                                        <Text style={[
+                                            styles.paidByText,
+                                            newExpense.paidBy === member && styles.paidByTextSelected
+                                        ]}>
+                                            {member === (user?.email || '') ? 'You' : member.split('@')[0]}
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                        </View>
+
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.label}>Split Between</Text>
+                            <View style={styles.splitContainer}>
+                                {members.map((member) => (
+                                    <TouchableOpacity
+                                        key={member}
+                                        style={[
+                                            styles.splitOption,
+                                            newExpense.splitBetween.includes(member) && styles.splitOptionSelected
+                                        ]}
+                                        onPress={() => toggleSplitMember(member)}
+                                    >
+                                        <Ionicons
+                                            name={newExpense.splitBetween.includes(member) ? "checkbox" : "square-outline"}
+                                            size={20}
+                                            color={newExpense.splitBetween.includes(member) ? "#6366F1" : "#6B7280"}
+                                        />
+                                        <Text style={styles.splitText}>
+                                            {member === (user?.email || '') ? 'You' : member.split('@')[0]}
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                        </View>
+
+                        <View style={styles.modalActions}>
+                            <TouchableOpacity
+                                style={styles.cancelButton}
+                                onPress={handleClose}
+                            >
+                                <Text style={styles.cancelButtonText}>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.addButton}
+                                onPress={handleAdd}
+                            >
+                                <LinearGradient
+                                    colors={['#6366F1', '#8B5CF6']}
+                                    style={styles.addButtonGradient}
+                                >
+                                    <Ionicons name="add" size={20} color="#fff" />
+                                    <Text style={styles.addButtonText}>Add Expense</Text>
+                                </LinearGradient>
+                            </TouchableOpacity>
+                        </View>
+                    </ScrollView>
+                </View>
+            </View>
+        </Modal>
+    );
+};
+
 const GroupDetails = () => {
     const { user } = useAuth();
     const router = useRouter();
@@ -35,12 +196,6 @@ const GroupDetails = () => {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [showAddExpense, setShowAddExpense] = useState(false);
-    const [newExpense, setNewExpense] = useState({
-        description: '',
-        amount: '',
-        paidBy: user?.email || '',
-        splitBetween: []
-    });
 
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(30)).current;
@@ -148,68 +303,45 @@ const GroupDetails = () => {
         }));
     };
 
-    const addExpense = async () => {
-        if (!newExpense.description.trim() || !newExpense.amount || !newExpense.paidBy) {
+    const addExpense = async (expenseData) => {
+        if (!expenseData.description.trim() || !expenseData.amount || !expenseData.paidBy) {
             Alert.alert('Error', 'Please fill in all fields');
             return;
         }
 
-        if (newExpense.splitBetween.length === 0) {
+        if (expenseData.splitBetween.length === 0) {
             Alert.alert('Error', 'Please select at least one person to split with');
             return;
         }
 
         try {
-            const expenseData = {
+            const expense = {
                 groupId,
-                description: newExpense.description.trim(),
-                amount: parseFloat(newExpense.amount),
-                paidBy: newExpense.paidBy,
-                splitBetween: newExpense.splitBetween,
+                description: expenseData.description.trim(),
+                amount: parseFloat(expenseData.amount),
+                paidBy: expenseData.paidBy,
+                splitBetween: expenseData.splitBetween,
                 createdAt: serverTimestamp(),
-                createdBy: user.email,
+                createdBy: user?.email || '',
                 members: members,
             };
 
-            await addDoc(collection(db, 'splitExpenses'), expenseData);
+            await addDoc(collection(db, 'splitExpenses'), expense);
 
             // Update group totals
             const groupRef = doc(db, 'splitGroups', groupId);
             await updateDoc(groupRef, {
-                totalExpenses: (group?.totalExpenses || 0) + parseFloat(newExpense.amount),
+                totalExpenses: (group?.totalExpenses || 0) + parseFloat(expenseData.amount),
                 pendingExpenses: (group?.pendingExpenses || 0) + 1,
                 updatedAt: serverTimestamp(),
             });
 
-            setNewExpense({
-                description: '',
-                amount: '',
-                paidBy: user?.email || '',
-                splitBetween: []
-            });
             setShowAddExpense(false);
             Alert.alert('Success', 'Expense added successfully!');
         } catch (error) {
             console.error('Error adding expense:', error);
             Alert.alert('Error', 'Failed to add expense. Please try again.');
         }
-    };
-
-    const toggleSplitMember = (member) => {
-        setNewExpense(prev => {
-            const isSelected = prev.splitBetween.includes(member);
-            if (isSelected) {
-                return {
-                    ...prev,
-                    splitBetween: prev.splitBetween.filter(m => m !== member)
-                };
-            } else {
-                return {
-                    ...prev,
-                    splitBetween: [...prev.splitBetween, member]
-                };
-            }
-        });
     };
 
     const settleBalance = async (fromMember, toMember, amount) => {
@@ -221,7 +353,7 @@ const GroupDetails = () => {
                 paidBy: fromMember,
                 splitBetween: [fromMember, toMember],
                 createdAt: serverTimestamp(),
-                createdBy: user.email,
+                createdBy: user?.email || '',
                 members: members,
                 settlement: true,
             };
@@ -256,7 +388,7 @@ const GroupDetails = () => {
                             {expense.description}
                         </Text>
                         <Text style={styles.expensePaidBy}>
-                            Paid by {expense.paidBy === user.email ? 'you' : expense.paidBy.split('@')[0]}
+                            Paid by {expense.paidBy === (user?.email || '') ? 'you' : expense.paidBy.split('@')[0]}
                         </Text>
                     </View>
                     <Text style={styles.expenseAmount}>
@@ -273,7 +405,7 @@ const GroupDetails = () => {
                             {expense.splitBetween.slice(0, 3).map((member, index) => (
                                 <View key={index} style={styles.splitMemberTag}>
                                     <Text style={styles.splitMemberText}>
-                                        {member === user.email ? 'You' : member.split('@')[0]}
+                                        {member === (user?.email || '') ? 'You' : member.split('@')[0]}
                                     </Text>
                                 </View>
                             ))}
@@ -299,7 +431,7 @@ const GroupDetails = () => {
     };
 
     const BalanceItem = ({ balance }) => {
-        const isYou = balance.member === user.email;
+        const isYou = balance.member === (user?.email || '');
         const isPositive = balance.balance > 0;
         const isNegative = balance.balance < 0;
         const isZero = balance.balance === 0;
@@ -328,125 +460,9 @@ const GroupDetails = () => {
         );
     };
 
-    const AddExpenseModal = () => (
-        <Modal
-            animationType="slide"
-            transparent={true}
-            visible={showAddExpense}
-            onRequestClose={() => setShowAddExpense(false)}
-        >
-            <View style={styles.modalOverlay}>
-                <View style={styles.modalContent}>
-                    <View style={styles.modalHeader}>
-                        <Text style={styles.modalTitle}>Add Expense</Text>
-                        <TouchableOpacity
-                            style={styles.closeButton}
-                            onPress={() => setShowAddExpense(false)}
-                        >
-                            <Ionicons name="close" size={24} color="#6B7280" />
-                        </TouchableOpacity>
-                    </View>
-
-                    <ScrollView
-                        style={styles.modalScroll}
-                        keyboardShouldPersistTaps="handled"
-                    >
-                        <View style={styles.inputGroup}>
-                            <Text style={styles.label}>Description</Text>
-                            <TextInput
-                                style={styles.input}
-                                placeholder="e.g., Dinner, Groceries, Rent"
-                                value={newExpense.description}
-                                onChangeText={(text) => setNewExpense(prev => ({ ...prev, description: text }))}
-                                returnKeyType="next"
-                            />
-                        </View>
-
-                        <View style={styles.inputGroup}>
-                            <Text style={styles.label}>Amount</Text>
-                            <TextInput
-                                style={styles.input}
-                                placeholder="0.00"
-                                value={newExpense.amount}
-                                onChangeText={(text) => setNewExpense(prev => ({ ...prev, amount: text }))}
-                                keyboardType="decimal-pad"
-                                returnKeyType="next"
-                            />
-                        </View>
-
-                        <View style={styles.inputGroup}>
-                            <Text style={styles.label}>Paid By</Text>
-                            <View style={styles.paidByContainer}>
-                                {members.map((member) => (
-                                    <TouchableOpacity
-                                        key={member}
-                                        style={[
-                                            styles.paidByOption,
-                                            newExpense.paidBy === member && styles.paidByOptionSelected
-                                        ]}
-                                        onPress={() => setNewExpense(prev => ({ ...prev, paidBy: member }))}
-                                    >
-                                        <Text style={[
-                                            styles.paidByText,
-                                            newExpense.paidBy === member && styles.paidByTextSelected
-                                        ]}>
-                                            {member === user.email ? 'You' : member.split('@')[0]}
-                                        </Text>
-                                    </TouchableOpacity>
-                                ))}
-                            </View>
-                        </View>
-
-                        <View style={styles.inputGroup}>
-                            <Text style={styles.label}>Split Between</Text>
-                            <View style={styles.splitContainer}>
-                                {members.map((member) => (
-                                    <TouchableOpacity
-                                        key={member}
-                                        style={[
-                                            styles.splitOption,
-                                            newExpense.splitBetween.includes(member) && styles.splitOptionSelected
-                                        ]}
-                                        onPress={() => toggleSplitMember(member)}
-                                    >
-                                        <Ionicons
-                                            name={newExpense.splitBetween.includes(member) ? "checkbox" : "square-outline"}
-                                            size={20}
-                                            color={newExpense.splitBetween.includes(member) ? "#6366F1" : "#6B7280"}
-                                        />
-                                        <Text style={styles.splitText}>
-                                            {member === user.email ? 'You' : member.split('@')[0]}
-                                        </Text>
-                                    </TouchableOpacity>
-                                ))}
-                            </View>
-                        </View>
-
-                        <View style={styles.modalActions}>
-                            <TouchableOpacity
-                                style={styles.cancelButton}
-                                onPress={() => setShowAddExpense(false)}
-                            >
-                                <Text style={styles.cancelButtonText}>Cancel</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                style={styles.addButton}
-                                onPress={addExpense}
-                            >
-                                <LinearGradient
-                                    colors={['#6366F1', '#8B5CF6']}
-                                    style={styles.addButtonGradient}
-                                >
-                                    <Ionicons name="add" size={20} color="#fff" />
-                                    <Text style={styles.addButtonText}>Add Expense</Text>
-                                </LinearGradient>
-                            </TouchableOpacity>
-                        </View>
-                    </ScrollView>
-                </View>
-            </View>
-        </Modal>
-    );
+    const handleCloseAddExpense = () => {
+        setShowAddExpense(false);
+    };
 
     if (loading) {
         return (
@@ -463,6 +479,27 @@ const GroupDetails = () => {
                 <View style={styles.loadingContainer}>
                     <ActivityIndicator size="large" color="#6366F1" />
                     <Text style={styles.loadingText}>Loading group details...</Text>
+                </View>
+            </View>
+        );
+    }
+
+    // Add a safety check for user object
+    if (!user) {
+        return (
+            <View style={styles.container}>
+                <View style={styles.header}>
+                    <TouchableOpacity
+                        style={styles.backButton}
+                        onPress={() => router.back()}
+                    >
+                        <Ionicons name="arrow-back" size={24} color="#6366F1" />
+                    </TouchableOpacity>
+                    <Text style={styles.title}>{groupName}</Text>
+                </View>
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color="#6366F1" />
+                    <Text style={styles.loadingText}>Loading user information...</Text>
                 </View>
             </View>
         );
@@ -506,6 +543,7 @@ const GroupDetails = () => {
                         tintColor="#6366F1"
                     />
                 }
+                keyboardShouldPersistTaps="handled"
             >
                 {/* Group Stats */}
                 <Animated.View
@@ -589,11 +627,19 @@ const GroupDetails = () => {
                 </Animated.View>
             </ScrollView>
 
-            <AddExpenseModal />
+            <AddExpenseModal
+                visible={showAddExpense}
+                onClose={handleCloseAddExpense}
+                onAdd={addExpense}
+                members={members}
+                user={user}
+            />
             <View style={styles.bottomPadding} />
         </View>
     );
 };
+
+// ... (keep the same styles object as before)
 
 const styles = StyleSheet.create({
     container: {
