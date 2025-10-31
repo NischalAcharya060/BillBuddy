@@ -15,33 +15,20 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from "../../contexts/AuthContext";
 import { useRouter } from "expo-router";
-import { doc, updateDoc, getDoc } from "firebase/firestore";
+import { doc, updateDoc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
 import { db } from "../../firebase/config";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const Settings = () => {
-    const { user, updateUserProfile } = useAuth();
-    const router = useRouter();
-
-    const [activeTab, setActiveTab] = useState('profile');
-    const [loading, setLoading] = useState(false);
+// Separate ProfileTab component to prevent re-renders
+const ProfileTab = ({ user, onProfileUpdate }) => {
     const [profileData, setProfileData] = useState({
         displayName: '',
         email: '',
         phone: '',
     });
-    const [appearance, setAppearance] = useState({
-        theme: 'light', // 'light' or 'dark'
-        notifications: true,
-        currency: 'USD',
-    });
+    const [loading, setLoading] = useState(false);
 
     useEffect(() => {
-        loadUserData();
-        loadAppearanceSettings();
-    }, []);
-
-    const loadUserData = async () => {
         if (user) {
             setProfileData({
                 displayName: user.displayName || '',
@@ -49,7 +36,100 @@ const Settings = () => {
                 phone: user.phoneNumber || '',
             });
         }
+    }, [user]);
+
+    const handleProfileUpdate = async () => {
+        if (!profileData.displayName.trim()) {
+            Alert.alert('Error', 'Please enter your name');
+            return;
+        }
+
+        setLoading(true);
+        try {
+            await onProfileUpdate(profileData);
+            Alert.alert('Success', 'Profile updated successfully!');
+        } catch (error) {
+            console.error('Error updating profile:', error);
+            Alert.alert('Error', 'Failed to update profile. Please try again.');
+        } finally {
+            setLoading(false);
+        }
     };
+
+    return (
+        <View style={styles.tabContent}>
+            <Text style={styles.sectionTitle}>Profile Information</Text>
+
+            <View style={styles.inputGroup}>
+                <Text style={styles.label}>Full Name</Text>
+                <TextInput
+                    style={styles.input}
+                    placeholder="Enter your full name"
+                    value={profileData.displayName}
+                    onChangeText={(text) => setProfileData(prev => ({ ...prev, displayName: text }))}
+                    returnKeyType="done"
+                />
+            </View>
+
+            <View style={styles.inputGroup}>
+                <Text style={styles.label}>Email Address</Text>
+                <TextInput
+                    style={[styles.input, styles.disabledInput]}
+                    placeholder="Email address"
+                    value={profileData.email}
+                    editable={false}
+                />
+                <Text style={styles.helperText}>
+                    Email cannot be changed
+                </Text>
+            </View>
+
+            <View style={styles.inputGroup}>
+                <Text style={styles.label}>Phone Number</Text>
+                <TextInput
+                    style={styles.input}
+                    placeholder="Enter your phone number"
+                    value={profileData.phone}
+                    onChangeText={(text) => setProfileData(prev => ({ ...prev, phone: text }))}
+                    keyboardType="phone-pad"
+                    returnKeyType="done"
+                />
+            </View>
+
+            <TouchableOpacity
+                style={styles.saveButton}
+                onPress={handleProfileUpdate}
+                disabled={loading}
+            >
+                <LinearGradient
+                    colors={['#6366F1', '#8B5CF6']}
+                    style={styles.saveButtonGradient}
+                >
+                    {loading ? (
+                        <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                        <>
+                            <Ionicons name="save-outline" size={20} color="#fff" />
+                            <Text style={styles.saveButtonText}>Save Changes</Text>
+                        </>
+                    )}
+                </LinearGradient>
+            </TouchableOpacity>
+        </View>
+    );
+};
+
+// Separate AppearanceTab component to prevent re-renders
+const AppearanceTab = () => {
+    const [appearance, setAppearance] = useState({
+        theme: 'light',
+        notifications: true,
+        currency: 'USD',
+    });
+
+    useEffect(() => {
+        loadAppearanceSettings();
+    }, []);
 
     const loadAppearanceSettings = async () => {
         try {
@@ -80,40 +160,10 @@ const Settings = () => {
         }
     };
 
-    const handleProfileUpdate = async () => {
-        if (!profileData.displayName.trim()) {
-            Alert.alert('Error', 'Please enter your name');
-            return;
-        }
-
-        setLoading(true);
-        try {
-            await updateUserProfile({
-                displayName: profileData.displayName.trim(),
-            });
-
-            // Update in Firestore if you have a users collection
-            const userRef = doc(db, 'users', user.uid);
-            await updateDoc(userRef, {
-                displayName: profileData.displayName.trim(),
-                phone: profileData.phone,
-                updatedAt: new Date(),
-            });
-
-            Alert.alert('Success', 'Profile updated successfully!');
-        } catch (error) {
-            console.error('Error updating profile:', error);
-            Alert.alert('Error', 'Failed to update profile. Please try again.');
-        } finally {
-            setLoading(false);
-        }
-    };
-
     const handleThemeChange = async (theme) => {
         setAppearance(prev => ({ ...prev, theme }));
         try {
             await AsyncStorage.setItem('app_theme', theme);
-            // You can implement theme context here to change the app theme globally
         } catch (error) {
             console.error('Error saving theme:', error);
         }
@@ -137,83 +187,7 @@ const Settings = () => {
         }
     };
 
-    const TabButton = ({ title, icon, isActive, onPress }) => (
-        <TouchableOpacity
-            style={[styles.tabButton, isActive && styles.tabButtonActive]}
-            onPress={onPress}
-        >
-            <Ionicons
-                name={icon}
-                size={20}
-                color={isActive ? "#6366F1" : "#6B7280"}
-            />
-            <Text style={[styles.tabButtonText, isActive && styles.tabButtonTextActive]}>
-                {title}
-            </Text>
-        </TouchableOpacity>
-    );
-
-    const ProfileTab = () => (
-        <View style={styles.tabContent}>
-            <Text style={styles.sectionTitle}>Profile Information</Text>
-
-            <View style={styles.inputGroup}>
-                <Text style={styles.label}>Full Name</Text>
-                <TextInput
-                    style={styles.input}
-                    placeholder="Enter your full name"
-                    value={profileData.displayName}
-                    onChangeText={(text) => setProfileData(prev => ({ ...prev, displayName: text }))}
-                />
-            </View>
-
-            <View style={styles.inputGroup}>
-                <Text style={styles.label}>Email Address</Text>
-                <TextInput
-                    style={[styles.input, styles.disabledInput]}
-                    placeholder="Email address"
-                    value={profileData.email}
-                    editable={false}
-                />
-                <Text style={styles.helperText}>
-                    Email cannot be changed
-                </Text>
-            </View>
-
-            <View style={styles.inputGroup}>
-                <Text style={styles.label}>Phone Number</Text>
-                <TextInput
-                    style={styles.input}
-                    placeholder="Enter your phone number"
-                    value={profileData.phone}
-                    onChangeText={(text) => setProfileData(prev => ({ ...prev, phone: text }))}
-                    keyboardType="phone-pad"
-                />
-            </View>
-
-            <TouchableOpacity
-                style={styles.saveButton}
-                onPress={handleProfileUpdate}
-                disabled={loading}
-            >
-                <LinearGradient
-                    colors={['#6366F1', '#8B5CF6']}
-                    style={styles.saveButtonGradient}
-                >
-                    {loading ? (
-                        <ActivityIndicator size="small" color="#fff" />
-                    ) : (
-                        <>
-                            <Ionicons name="save-outline" size={20} color="#fff" />
-                            <Text style={styles.saveButtonText}>Save Changes</Text>
-                        </>
-                    )}
-                </LinearGradient>
-            </TouchableOpacity>
-        </View>
-    );
-
-    const AppearanceTab = () => (
+    return (
         <View style={styles.tabContent}>
             <Text style={styles.sectionTitle}>Appearance</Text>
 
@@ -340,6 +314,35 @@ const Settings = () => {
             </View>
         </View>
     );
+};
+
+const Settings = () => {
+    const { user, updateUserProfile } = useAuth();
+    const router = useRouter();
+    const [activeTab, setActiveTab] = useState('profile');
+
+    const TabButton = ({ title, icon, isActive, onPress }) => (
+        <TouchableOpacity
+            style={[styles.tabButton, isActive && styles.tabButtonActive]}
+            onPress={onPress}
+        >
+            <Ionicons
+                name={icon}
+                size={20}
+                color={isActive ? "#6366F1" : "#6B7280"}
+            />
+            <Text style={[styles.tabButtonText, isActive && styles.tabButtonTextActive]}>
+                {title}
+            </Text>
+        </TouchableOpacity>
+    );
+
+    const handleProfileUpdate = async (profileData) => {
+        return await updateUserProfile({
+            displayName: profileData.displayName.trim(),
+            phone: profileData.phone,
+        });
+    };
 
     return (
         <View style={styles.container}>
@@ -371,8 +374,13 @@ const Settings = () => {
             <ScrollView
                 style={styles.scrollView}
                 showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
             >
-                {activeTab === 'profile' ? <ProfileTab /> : <AppearanceTab />}
+                {activeTab === 'profile' ? (
+                    <ProfileTab user={user} onProfileUpdate={handleProfileUpdate} />
+                ) : (
+                    <AppearanceTab />
+                )}
 
                 {/* App Info */}
                 <View style={styles.appInfo}>
@@ -380,6 +388,7 @@ const Settings = () => {
                     <Text style={styles.appCopyright}>© 2025 BillBuddy App. All rights reserved.</Text>
                 </View>
             </ScrollView>
+            <View style={styles.bottomPadding} />
         </View>
     );
 };
@@ -629,6 +638,9 @@ const styles = StyleSheet.create({
         fontSize: 12,
         color: '#9CA3AF',
         textAlign: 'center',
+    },
+    bottomPadding: {
+        height: 30,
     },
 });
 

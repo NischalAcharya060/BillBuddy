@@ -1,5 +1,5 @@
 // src/app/(auth)/register.jsx
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert, Animated } from "react-native";
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert, Animated, ActivityIndicator } from "react-native";
 import React, { useState, useRef, useEffect } from "react";
 import { Link, useRouter } from "expo-router";
 import { LinearGradient } from 'expo-linear-gradient';
@@ -53,14 +53,20 @@ const Register = () => {
         }
 
         setLoading(true);
-        const result = await signUp(email, password);
-        setLoading(false);
+        try {
+            const result = await signUp(email, password, fullName);
 
-        if (result.success) {
-            Alert.alert('Success', 'Account created successfully!');
-            router.replace('/(tabs)');
-        } else {
-            Alert.alert('Registration Failed', result.error);
+            if (result.success) {
+                Alert.alert('Success', 'Account created successfully!');
+                router.replace('/(tabs)');
+            } else {
+                Alert.alert('Registration Failed', result.error);
+            }
+        } catch (error) {
+            console.error('Registration error:', error);
+            Alert.alert('Error', 'An unexpected error occurred. Please try again.');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -69,6 +75,7 @@ const Register = () => {
             style={styles.container}
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
         >
             {/* Background Gradient */}
             <LinearGradient
@@ -108,6 +115,7 @@ const Register = () => {
                                 value={fullName}
                                 onChangeText={setFullName}
                                 autoCapitalize="words"
+                                returnKeyType="next"
                             />
                         </View>
                     </View>
@@ -126,6 +134,7 @@ const Register = () => {
                                 keyboardType="email-address"
                                 autoCapitalize="none"
                                 autoComplete="email"
+                                returnKeyType="next"
                             />
                         </View>
                     </View>
@@ -143,6 +152,7 @@ const Register = () => {
                                 onChangeText={setPassword}
                                 secureTextEntry={!showPassword}
                                 autoCapitalize="none"
+                                returnKeyType="next"
                             />
                             <TouchableOpacity
                                 style={styles.eyeIcon}
@@ -171,6 +181,8 @@ const Register = () => {
                                 onChangeText={setConfirmPassword}
                                 secureTextEntry={!showConfirmPassword}
                                 autoCapitalize="none"
+                                returnKeyType="done"
+                                onSubmitEditing={handleRegister}
                             />
                             <TouchableOpacity
                                 style={styles.eyeIcon}
@@ -207,7 +219,10 @@ const Register = () => {
                             style={styles.buttonGradient}
                         >
                             {loading ? (
-                                <Text style={styles.buttonText}>Creating Account...</Text>
+                                <>
+                                    <ActivityIndicator size="small" color="#fff" />
+                                    <Text style={styles.buttonText}>Creating Account...</Text>
+                                </>
                             ) : (
                                 <>
                                     <Ionicons name="person-add-outline" size={20} color="#fff" />
@@ -362,12 +377,12 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         paddingVertical: 18,
         borderRadius: 16,
+        gap: 8,
     },
     buttonText: {
         color: '#fff',
         fontSize: 18,
         fontWeight: '600',
-        marginLeft: 8,
     },
     signInContainer: {
         flexDirection: 'row',
