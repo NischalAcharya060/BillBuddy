@@ -121,6 +121,27 @@ const TabsLayout = () => {
                 }}
             />
             <Tabs.Screen
+                name="converter"
+                options={{
+                    title: 'Converter',
+                    tabBarIcon: ({ color, size, focused }) => (
+                        <View style={focused ? styles.iconContainerFocused : styles.iconContainer}>
+                            <View style={[
+                                styles.iconInner,
+                                focused && styles.iconInnerFocused
+                            ]}>
+                                <Ionicons
+                                    name={focused ? "swap-horizontal" : "swap-horizontal-outline"}
+                                    size={focused ? 22 : 20}
+                                    color={focused ? '#fff' : color}
+                                />
+                            </View>
+                            {focused && <View style={styles.activeDot} />}
+                        </View>
+                    ),
+                }}
+            />
+            <Tabs.Screen
                 name="add"
                 options={{
                     title: 'Add',
