@@ -8,6 +8,7 @@ import { useRouter } from "expo-router";
 import { db } from "../../firebase/config";
 import { collection, query, where, onSnapshot, orderBy } from "firebase/firestore";
 import { useTheme } from "../../contexts/ThemeContext";
+import { useCurrency } from "../../contexts/CurrencyContext"; // Add currency context
 
 const { width, height } = Dimensions.get('window');
 
@@ -47,6 +48,7 @@ const darkColors = {
 const Dashboard = () => {
     const { user, logout } = useAuth();
     const { isDark } = useTheme();
+    const { formatCurrency } = useCurrency(); // Add currency hook
     const router = useRouter();
     const [bills, setBills] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -325,7 +327,7 @@ const Dashboard = () => {
                         </Text>
                     </View>
                 </View>
-                <Text style={styles.billAmount}>${bill.amount.toFixed(2)}</Text>
+                <Text style={styles.billAmount}>{formatCurrency(bill.amount)}</Text>
             </Animated.View>
         );
     };
@@ -370,7 +372,7 @@ const Dashboard = () => {
                 <View style={styles.statsGrid}>
                     <StatCard
                         title="Monthly Spend"
-                        value={`$${stats.monthlySpending.toFixed(0)}`}
+                        value={formatCurrency(stats.monthlySpending, { decimalPlaces: 0 })}
                         subtitle="This month"
                         icon="wallet-outline"
                         gradient={colors.gradient}
@@ -391,7 +393,7 @@ const Dashboard = () => {
                     />
                     <StatCard
                         title="Savings"
-                        value={`$${stats.totalSavings.toFixed(0)}`}
+                        value={formatCurrency(stats.totalSavings, { decimalPlaces: 0 })}
                         subtitle="Total saved"
                         icon="trending-up"
                         gradient={['#EC4899', '#F472B6']}
@@ -496,7 +498,7 @@ const Dashboard = () => {
                                         {bills.length} bills
                                     </Text>
                                     <Text style={styles.profileStat}>
-                                        ${stats.monthlySpending.toFixed(0)} spent
+                                        {formatCurrency(stats.monthlySpending, { decimalPlaces: 0 })} spent
                                     </Text>
                                 </View>
                             </View>

@@ -8,6 +8,7 @@ import { db } from "../../firebase/config";
 import { collection, query, where, onSnapshot, orderBy, updateDoc, doc, deleteDoc } from "firebase/firestore";
 import { useRouter } from "expo-router";
 import { useTheme } from "../../contexts/ThemeContext";
+import { useCurrency } from "../../contexts/CurrencyContext";
 
 const { width, height } = Dimensions.get('window');
 
@@ -51,6 +52,7 @@ const darkColors = {
 const Bills = () => {
     const { user } = useAuth();
     const { isDark } = useTheme();
+    const { formatCurrency } = useCurrency(); // Add currency context
     const router = useRouter();
     const [bills, setBills] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -320,7 +322,7 @@ const Bills = () => {
                             <Text style={styles.billCategory}>{category.name}</Text>
                         </View>
                     </View>
-                    <Text style={styles.billAmount}>${item.amount.toFixed(2)}</Text>
+                    <Text style={styles.billAmount}>{formatCurrency(item.amount)}</Text>
                 </View>
 
                 <View style={styles.billFooter}>
@@ -408,7 +410,7 @@ const Bills = () => {
             { value: totalBills, label: 'Total', color: colors.primary, icon: 'documents' },
             { value: paidBills, label: 'Paid', color: colors.success, icon: 'checkmark-circle' },
             { value: pendingBills, label: 'Pending', color: colors.warning, icon: 'time' },
-            { value: `$${pendingAmount.toFixed(0)}`, label: 'Due', color: '#EC4899', icon: 'cash' },
+            { value: formatCurrency(pendingAmount, { decimalPlaces: 0 }), label: 'Due', color: '#EC4899', icon: 'cash' },
         ];
 
         return (
@@ -467,7 +469,7 @@ const Bills = () => {
                             </LinearGradient>
                             <View style={styles.billPreviewInfo}>
                                 <Text style={styles.billPreviewName}>{selectedBill.name}</Text>
-                                <Text style={styles.billPreviewAmount}>${selectedBill.amount.toFixed(2)}</Text>
+                                <Text style={styles.billPreviewAmount}>{formatCurrency(selectedBill.amount)}</Text>
                                 <Text style={styles.billPreviewDue}>
                                     Due {formatDate(selectedBill.dueTimestamp || selectedBill.dueDate)}
                                 </Text>

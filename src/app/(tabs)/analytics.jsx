@@ -16,6 +16,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { db } from "../../firebase/config";
 import { collection, query, where, onSnapshot, orderBy } from "firebase/firestore";
 import { useTheme } from "../../contexts/ThemeContext";
+import { useCurrency } from "../../contexts/CurrencyContext"; // Add currency context
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -59,6 +60,7 @@ const darkColors = {
 const Analytics = () => {
     const { user } = useAuth();
     const { isDark } = useTheme();
+    const { formatCurrency } = useCurrency(); // Add currency hook
     const [bills, setBills] = useState([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -312,7 +314,7 @@ const Analytics = () => {
                         <View style={styles.barLabelContainer}>
                             <Text style={styles.barLabel}>{item.month}</Text>
                             <Text style={styles.barValue}>
-                                ${item.amount > 0 ? item.amount.toFixed(0) : '0'}
+                                {formatCurrency(item.amount, { decimalPlaces: 0 })}
                             </Text>
                         </View>
                         <View style={styles.barBackground}>
@@ -350,7 +352,7 @@ const Analytics = () => {
                     </Text>
                 </View>
                 <View style={styles.categoryAmount}>
-                    <Text style={styles.categoryValue}>${amount.toFixed(2)}</Text>
+                    <Text style={styles.categoryValue}>{formatCurrency(amount)}</Text>
                     <Text style={styles.categoryPercentage}>{percentage.toFixed(1)}%</Text>
                 </View>
             </View>
@@ -438,14 +440,14 @@ const Analytics = () => {
             <View style={styles.statsGrid}>
                 <StatCard
                     title="Total Spent"
-                    value={`$${analytics.totalSpent.toFixed(0)}`}
+                    value={formatCurrency(analytics.totalSpent, { decimalPlaces: 0 })}
                     subtitle={`${timeRange}ly total`}
                     icon="wallet-outline"
                     gradient={colors.gradient}
                 />
                 <StatCard
                     title="Avg. Bill"
-                    value={`$${analytics.averageBill.toFixed(0)}`}
+                    value={formatCurrency(analytics.averageBill, { decimalPlaces: 0 })}
                     subtitle="Per bill"
                     icon="calculator-outline"
                     gradient={['#10B981', '#34D399']}
@@ -529,7 +531,7 @@ const Analytics = () => {
                     <InsightCard
                         title="Highest Category"
                         value={analytics.topCategories[0]?.category ? analytics.topCategories[0].category.charAt(0).toUpperCase() + analytics.topCategories[0].category.slice(1) : 'N/A'}
-                        subtitle={`$${analytics.topCategories[0]?.amount.toFixed(0) || '0'}`}
+                        subtitle={formatCurrency(analytics.topCategories[0]?.amount || 0, { decimalPlaces: 0 })}
                         icon="trending-up"
                         gradient={['#10B981', '#34D399']}
                     />
@@ -544,7 +546,7 @@ const Analytics = () => {
 
                     <InsightCard
                         title="Monthly Avg"
-                        value={`$${analytics.averageBill.toFixed(0)}`}
+                        value={formatCurrency(analytics.averageBill, { decimalPlaces: 0 })}
                         subtitle="Per bill"
                         icon="cash"
                         gradient={['#F59E0B', '#FBBF24']}

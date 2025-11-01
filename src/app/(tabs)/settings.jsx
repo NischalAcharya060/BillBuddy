@@ -19,6 +19,7 @@ import { doc, updateDoc, getDoc, serverTimestamp, setDoc } from "firebase/firest
 import { db } from "../../firebase/config";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from "../../contexts/ThemeContext";
+import { useCurrency } from "../../contexts/CurrencyContext";
 
 // Theme colors
 const lightColors = {
@@ -399,10 +400,10 @@ const ProfileTab = ({ user, onProfileUpdate, isDark }) => {
 // Separate AppearanceTab component to prevent re-renders
 const AppearanceTab = ({ isDark, onThemeChange }) => {
     const styles = createStyles(isDark);
+    const { currency, updateCurrency, formatCurrency } = useCurrency();
     const [appearance, setAppearance] = useState({
         theme: isDark ? 'dark' : 'light',
         notifications: true,
-        currency: 'USD',
     });
 
     useEffect(() => {
@@ -412,18 +413,10 @@ const AppearanceTab = ({ isDark, onThemeChange }) => {
     const loadAppearanceSettings = async () => {
         try {
             const savedNotifications = await AsyncStorage.getItem('notifications_enabled');
-            const savedCurrency = await AsyncStorage.getItem('currency');
-
             if (savedNotifications !== null) {
                 setAppearance(prev => ({
                     ...prev,
                     notifications: savedNotifications === 'true'
-                }));
-            }
-            if (savedCurrency) {
-                setAppearance(prev => ({
-                    ...prev,
-                    currency: savedCurrency
                 }));
             }
         } catch (error) {
@@ -450,13 +443,8 @@ const AppearanceTab = ({ isDark, onThemeChange }) => {
         }
     };
 
-    const handleCurrencyChange = async (currency) => {
-        setAppearance(prev => ({ ...prev, currency }));
-        try {
-            await AsyncStorage.setItem('currency', currency);
-        } catch (error) {
-            console.error('Error saving currency:', error);
-        }
+    const handleCurrencyChange = async (newCurrency) => {
+        await updateCurrency(newCurrency);
     };
 
     // Update local state when theme changes from outside
@@ -529,25 +517,25 @@ const AppearanceTab = ({ isDark, onThemeChange }) => {
                     <View style={styles.settingText}>
                         <Text style={styles.settingTitle}>Currency</Text>
                         <Text style={styles.settingDescription}>
-                            Default currency for expenses
+                            Display format for all amounts. Example: {formatCurrency(1000)}
                         </Text>
                     </View>
                 </View>
                 <View style={styles.currencyOptions}>
-                    {['USD', 'NPR'].map((currency) => (
+                    {['USD', 'NPR'].map((curr) => (
                         <TouchableOpacity
-                            key={currency}
+                            key={curr}
                             style={[
                                 styles.currencyOption,
-                                appearance.currency === currency && styles.currencyOptionActive
+                                currency === curr && styles.currencyOptionActive
                             ]}
-                            onPress={() => handleCurrencyChange(currency)}
+                            onPress={() => handleCurrencyChange(curr)}
                         >
                             <Text style={[
                                 styles.currencyOptionText,
-                                appearance.currency === currency && styles.currencyOptionTextActive
+                                currency === curr && styles.currencyOptionTextActive
                             ]}>
-                                {currency}
+                                {curr}
                             </Text>
                         </TouchableOpacity>
                     ))}
@@ -580,7 +568,7 @@ const AppearanceTab = ({ isDark, onThemeChange }) => {
 
 const Settings = () => {
     const { user, updateUserProfile } = useAuth();
-    const { isDark, setTheme } = useTheme(); // Use setTheme from context
+    const { isDark, setTheme } = useTheme();
     const router = useRouter();
     const [activeTab, setActiveTab] = useState('profile');
 

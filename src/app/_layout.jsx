@@ -4,6 +4,8 @@ import { StatusBar } from "expo-status-bar";
 import { AuthProvider, useAuth } from "../contexts/AuthContext";
 import { ActivityIndicator, View } from "react-native";
 import { ThemeProvider } from '../contexts/ThemeContext';
+import { CurrencyProvider } from '../contexts/CurrencyContext';
+
 
 function RootLayoutNav() {
     const { loading } = useAuth();
@@ -69,10 +71,12 @@ function RootLayoutNav() {
 
 export default function RootLayout() {
     return (
+        <CurrencyProvider>
         <ThemeProvider>
             <AuthProvider>
                 <RootLayoutNav />
             </AuthProvider>
         </ThemeProvider>
+        </CurrencyProvider>
     );
 }

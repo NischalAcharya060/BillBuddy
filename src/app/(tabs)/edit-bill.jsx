@@ -9,6 +9,7 @@ import { db } from "../../firebase/config";
 import { doc, getDoc, updateDoc, deleteDoc } from "firebase/firestore";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useTheme } from "../../contexts/ThemeContext";
+import { useCurrency } from "../../contexts/CurrencyContext"; // Add currency context
 
 const { width } = Dimensions.get('window');
 
@@ -50,6 +51,7 @@ const EditBill = () => {
     const router = useRouter();
     const { user } = useAuth();
     const { isDark } = useTheme();
+    const { currency, symbol } = useCurrency(); // Add currency hook
 
     const [billName, setBillName] = useState('');
     const [amount, setAmount] = useState('');
@@ -62,7 +64,7 @@ const EditBill = () => {
     const [isSaving, setIsSaving] = useState(false);
 
     const colors = isDark ? darkColors : lightColors;
-    const styles = createStyles(colors, isDark);
+    const styles = createStyles(colors, isDark, currency); // Pass currency to createStyles
 
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(30)).current;
@@ -232,7 +234,7 @@ const EditBill = () => {
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
             >
-                <Text style={styles.quickAmountText}>${quickAmount}</Text>
+                <Text style={styles.quickAmountText}>{symbol}{quickAmount}</Text>
             </LinearGradient>
         </TouchableOpacity>
     );
@@ -315,7 +317,7 @@ const EditBill = () => {
                         Amount <Text style={styles.required}>*</Text>
                     </Text>
                     <View style={styles.amountContainer}>
-                        <Text style={styles.currencySymbol}>$</Text>
+                        <Text style={styles.currencySymbol}>{symbol}</Text>
                         <TextInput
                             style={[styles.input, styles.amountInput]}
                             placeholder="0.00"
@@ -507,7 +509,8 @@ const EditBill = () => {
     );
 };
 
-const createStyles = (colors, isDark) => StyleSheet.create({
+// Update createStyles to accept currency parameter
+const createStyles = (colors, isDark, currency) => StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: colors.background,
@@ -610,7 +613,7 @@ const createStyles = (colors, isDark) => StyleSheet.create({
         zIndex: 1,
     },
     amountInput: {
-        paddingLeft: 40,
+        paddingLeft: currency === 'NPR' ? 42 : 40,
     },
     quickAmounts: {
         marginTop: 8,
