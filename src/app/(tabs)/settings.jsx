@@ -8,7 +8,8 @@ import {
     TextInput,
     Switch,
     Alert,
-    ActivityIndicator
+    ActivityIndicator,
+    Modal
 } from "react-native";
 import React, { useState, useEffect } from "react";
 import { LinearGradient } from 'expo-linear-gradient';
@@ -239,7 +240,9 @@ const createStyles = (isDark) => {
         },
         currencyOptions: {
             flexDirection: 'row',
+            flexWrap: 'wrap',
             gap: 8,
+            marginBottom: 12,
         },
         currencyOption: {
             paddingHorizontal: 16,
@@ -260,6 +263,22 @@ const createStyles = (isDark) => {
         },
         currencyOptionTextActive: {
             color: colors.primary,
+        },
+        fullCurrencyButton: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 12,
+            borderRadius: 8,
+            borderWidth: 1,
+            borderColor: colors.border,
+            backgroundColor: colors.surfaceSecondary,
+            gap: 8,
+        },
+        fullCurrencyButtonText: {
+            fontSize: 14,
+            fontWeight: '600',
+            color: colors.textSecondary,
         },
         preferenceItem: {
             flexDirection: 'row',
@@ -286,6 +305,34 @@ const createStyles = (isDark) => {
             color: colors.textSecondary,
             marginRight: 8,
         },
+        switchContainer: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            backgroundColor: colors.surface,
+            padding: 20,
+            borderRadius: 16,
+            marginBottom: 8,
+            shadowColor: colors.shadow,
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.1,
+            shadowRadius: 8,
+            elevation: 2,
+        },
+        switchText: {
+            flex: 1,
+        },
+        switchTitle: {
+            fontSize: 16,
+            fontWeight: '700',
+            color: colors.textPrimary,
+            marginBottom: 4,
+        },
+        switchDescription: {
+            fontSize: 14,
+            color: colors.textSecondary,
+            lineHeight: 20,
+        },
         appInfo: {
             alignItems: 'center',
             padding: 40,
@@ -305,7 +352,116 @@ const createStyles = (isDark) => {
         bottomPadding: {
             height: 30,
         },
+        // Modal Styles
+        modalOverlay: {
+            flex: 1,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: 20,
+        },
+        modalContent: {
+            width: '100%',
+            maxWidth: 400,
+            backgroundColor: colors.surface,
+            borderRadius: 20,
+            padding: 20,
+            maxHeight: '80%',
+        },
+        modalHeader: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: 20,
+        },
+        modalTitle: {
+            fontSize: 20,
+            fontWeight: '700',
+            color: colors.textPrimary,
+        },
+        currencyList: {
+            maxHeight: 400,
+        },
+        currencyListItem: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: 16,
+            borderBottomWidth: 1,
+            borderBottomColor: colors.border,
+        },
+        currencyListText: {
+            fontSize: 16,
+            color: colors.textPrimary,
+            fontWeight: '500',
+        },
+        currencyListSymbol: {
+            fontSize: 14,
+            color: colors.textSecondary,
+        },
+        selectedCurrency: {
+            backgroundColor: colors.primaryLight,
+        },
     });
+};
+
+// Currency Modal Component
+const CurrencyModal = ({ visible, onClose, currentCurrency, onCurrencySelect, isDark }) => {
+    const styles = createStyles(isDark);
+    const { getSupportedCurrencies } = useCurrency();
+    const currencies = getSupportedCurrencies();
+
+    return (
+        <Modal
+            visible={visible}
+            transparent={true}
+            animationType="slide"
+            onRequestClose={onClose}
+        >
+            <View style={styles.modalOverlay}>
+                <View style={styles.modalContent}>
+                    <View style={styles.modalHeader}>
+                        <Text style={styles.modalTitle}>Select Currency</Text>
+                        <TouchableOpacity onPress={onClose}>
+                            <Ionicons name="close" size={24} color={isDark ? darkColors.textSecondary : lightColors.textSecondary} />
+                        </TouchableOpacity>
+                    </View>
+
+                    <ScrollView style={styles.currencyList}>
+                        {currencies.map((currency) => (
+                            <TouchableOpacity
+                                key={currency.code}
+                                style={[
+                                    styles.currencyListItem,
+                                    currentCurrency === currency.code && styles.selectedCurrency
+                                ]}
+                                onPress={() => {
+                                    onCurrencySelect(currency.code);
+                                    onClose();
+                                }}
+                            >
+                                <View>
+                                    <Text style={styles.currencyListText}>
+                                        {currency.name}
+                                    </Text>
+                                    <Text style={styles.currencyListSymbol}>
+                                        {currency.symbol} • {currency.code}
+                                    </Text>
+                                </View>
+                                {currentCurrency === currency.code && (
+                                    <Ionicons
+                                        name="checkmark"
+                                        size={20}
+                                        color={isDark ? darkColors.primary : lightColors.primary}
+                                    />
+                                )}
+                            </TouchableOpacity>
+                        ))}
+                    </ScrollView>
+                </View>
+            </View>
+        </Modal>
+    );
 };
 
 // Separate ProfileTab component to prevent re-renders
@@ -400,11 +556,15 @@ const ProfileTab = ({ user, onProfileUpdate, isDark }) => {
 // Separate AppearanceTab component to prevent re-renders
 const AppearanceTab = ({ isDark, onThemeChange }) => {
     const styles = createStyles(isDark);
-    const { currency, updateCurrency, formatCurrency } = useCurrency();
+    const { currency, updateCurrency, formatCurrency, getSupportedCurrencies } = useCurrency();
     const [appearance, setAppearance] = useState({
         theme: isDark ? 'dark' : 'light',
         notifications: true,
     });
+    const [showCurrencyModal, setShowCurrencyModal] = useState(false);
+
+    // Popular currencies for quick selection
+    const popularCurrencies = ['USD', 'EUR', 'GBP', 'NPR', 'JPY', 'CAD'];
 
     useEffect(() => {
         loadAppearanceSettings();
@@ -428,7 +588,7 @@ const AppearanceTab = ({ isDark, onThemeChange }) => {
         setAppearance(prev => ({ ...prev, theme }));
         try {
             await AsyncStorage.setItem('app_theme', theme);
-            onThemeChange(theme); // This triggers immediate theme change
+            onThemeChange(theme);
         } catch (error) {
             console.error('Error saving theme:', error);
         }
@@ -521,8 +681,10 @@ const AppearanceTab = ({ isDark, onThemeChange }) => {
                         </Text>
                     </View>
                 </View>
+
+                {/* Quick selection for popular currencies */}
                 <View style={styles.currencyOptions}>
-                    {['USD', 'NPR'].map((curr) => (
+                    {popularCurrencies.map((curr) => (
                         <TouchableOpacity
                             key={curr}
                             style={[
@@ -540,9 +702,35 @@ const AppearanceTab = ({ isDark, onThemeChange }) => {
                         </TouchableOpacity>
                     ))}
                 </View>
+
+                {/* Full currency selection */}
+                <TouchableOpacity
+                    style={styles.fullCurrencyButton}
+                    onPress={() => setShowCurrencyModal(true)}
+                >
+                    <Text style={styles.fullCurrencyButtonText}>
+                        View All Currencies ({getSupportedCurrencies().length})
+                    </Text>
+                    <Ionicons name="chevron-down" size={16} color={isDark ? darkColors.textSecondary : lightColors.textSecondary} />
+                </TouchableOpacity>
             </View>
 
             <Text style={styles.sectionTitle}>Preferences</Text>
+
+            <View style={styles.switchContainer}>
+                <View style={styles.switchText}>
+                    <Text style={styles.switchTitle}>Push Notifications</Text>
+                    <Text style={styles.switchDescription}>
+                        Receive bill reminders and important updates
+                    </Text>
+                </View>
+                <Switch
+                    value={appearance.notifications}
+                    onValueChange={handleNotificationsChange}
+                    trackColor={{ false: isDark ? '#334155' : '#D1D5DB', true: isDark ? '#818cf8' : '#6366F1' }}
+                    thumbColor={appearance.notifications ? '#fff' : '#f3f4f6'}
+                />
+            </View>
 
             <View style={styles.preferenceItem}>
                 <Ionicons name="language-outline" size={20} color={isDark ? darkColors.textSecondary : lightColors.textSecondary} />
@@ -552,16 +740,19 @@ const AppearanceTab = ({ isDark, onThemeChange }) => {
             </View>
 
             <View style={styles.preferenceItem}>
-                <Ionicons name="lock-closed-outline" size={20} color={isDark ? darkColors.textSecondary : lightColors.textSecondary} />
-                <Text style={styles.preferenceText}>Privacy & Security</Text>
-                <Ionicons name="chevron-forward" size={20} color={isDark ? darkColors.textTertiary : lightColors.textTertiary} />
-            </View>
-
-            <View style={styles.preferenceItem}>
                 <Ionicons name="help-circle-outline" size={20} color={isDark ? darkColors.textSecondary : lightColors.textSecondary} />
                 <Text style={styles.preferenceText}>Help & Support</Text>
                 <Ionicons name="chevron-forward" size={20} color={isDark ? darkColors.textTertiary : lightColors.textTertiary} />
             </View>
+
+            {/* Currency Selection Modal */}
+            <CurrencyModal
+                visible={showCurrencyModal}
+                onClose={() => setShowCurrencyModal(false)}
+                currentCurrency={currency}
+                onCurrencySelect={handleCurrencyChange}
+                isDark={isDark}
+            />
         </View>
     );
 };
@@ -647,8 +838,8 @@ const Settings = () => {
 
                 {/* App Info */}
                 <View style={styles.appInfo}>
-                    <Text style={styles.appVersion}>BillBuddy v1.0.0</Text>
-                    <Text style={styles.appCopyright}>© 2025 BillBuddy App. All rights reserved.</Text>
+                    <Text style={styles.appVersion}>BillTracker Pro v1.0.0</Text>
+                    <Text style={styles.appCopyright}>© 2025 BillTracker Pro. All rights reserved.</Text>
                 </View>
             </ScrollView>
             <View style={styles.bottomPadding} />
