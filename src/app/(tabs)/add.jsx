@@ -25,7 +25,6 @@ const lightColors = {
     primaryLight: 'rgba(99, 102, 241, 0.1)',
     gradient: ['#6366F1', '#8B5CF6'],
     shadow: '#000',
-    disabled: '#F9FAFB',
     danger: '#EF4444',
 };
 
@@ -40,14 +39,13 @@ const darkColors = {
     primaryLight: 'rgba(129, 140, 248, 0.1)',
     gradient: ['#818cf8', '#a78bfa'],
     shadow: '#000',
-    disabled: '#1e293b',
     danger: '#F87171',
 };
 
 const AddBill = () => {
     const { user } = useAuth();
     const { isDark } = useTheme();
-    const { currency, symbol } = useCurrency();
+    const { currency, formatCurrency } = useCurrency();
     const router = useRouter();
     const [billName, setBillName] = useState('');
     const [amount, setAmount] = useState('');
@@ -59,7 +57,7 @@ const AddBill = () => {
     const [isLoading, setIsLoading] = useState(false);
 
     const colors = isDark ? darkColors : lightColors;
-    const styles = createStyles(colors, isDark, currency); // Pass currency to createStyles
+    const styles = createStyles(colors, isDark);
 
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(30)).current;
@@ -108,12 +106,19 @@ const AddBill = () => {
             return;
         }
 
+        // Validate amount
+        const amountValue = parseFloat(amount);
+        if (isNaN(amountValue) || amountValue <= 0) {
+            Alert.alert('Invalid Amount', 'Please enter a valid amount greater than 0.');
+            return;
+        }
+
         setIsLoading(true);
 
         try {
             const billData = {
                 name: billName.trim(),
-                amount: parseFloat(amount),
+                amount: amountValue,
                 category,
                 dueDate: dueDate.toISOString().split('T')[0],
                 dueTimestamp: dueDate,
@@ -186,7 +191,7 @@ const AddBill = () => {
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
             >
-                <Text style={styles.quickAmountText}>{symbol}{quickAmount}</Text>
+                <Text style={styles.quickAmountText}>{formatCurrency(quickAmount)}</Text>
             </LinearGradient>
         </TouchableOpacity>
     );
@@ -235,6 +240,7 @@ const AddBill = () => {
                         placeholderTextColor={colors.textTertiary}
                         value={billName}
                         onChangeText={setBillName}
+                        maxLength={50}
                     />
                 </View>
 
@@ -244,14 +250,23 @@ const AddBill = () => {
                         Amount <Text style={styles.required}>*</Text>
                     </Text>
                     <View style={styles.amountContainer}>
-                        <Text style={styles.currencySymbol}>{symbol}</Text>
                         <TextInput
                             style={[styles.input, styles.amountInput]}
                             placeholder="0.00"
                             placeholderTextColor={colors.textTertiary}
                             keyboardType="decimal-pad"
                             value={amount}
-                            onChangeText={(text) => setAmount(text.replace(/[^0-9.]/g, ''))}
+                            onChangeText={(text) => {
+                                // Allow only numbers and one decimal point
+                                const formatted = text.replace(/[^0-9.]/g, '');
+                                // Ensure only one decimal point
+                                const parts = formatted.split('.');
+                                if (parts.length > 2) {
+                                    setAmount(parts[0] + '.' + parts.slice(1).join(''));
+                                } else {
+                                    setAmount(formatted);
+                                }
+                            }}
                         />
                     </View>
 
@@ -275,37 +290,36 @@ const AddBill = () => {
                         horizontal
                         showsHorizontalScrollIndicator={false}
                         style={styles.categoriesScroll}
+                        contentContainerStyle={styles.categoriesContent}
                     >
-                        <View style={styles.categoriesContainer}>
-                            {categories.map((cat) => (
-                                <TouchableOpacity
-                                    key={cat.id}
+                        {categories.map((cat) => (
+                            <TouchableOpacity
+                                key={cat.id}
+                                style={[
+                                    styles.categoryButton,
+                                    category === cat.id && styles.categoryButtonActive
+                                ]}
+                                onPress={() => setCategory(cat.id)}
+                            >
+                                <LinearGradient
+                                    colors={cat.gradient}
                                     style={[
-                                        styles.categoryButton,
-                                        category === cat.id && styles.categoryButtonActive
+                                        styles.categoryIcon,
+                                        category === cat.id && styles.categoryIconActive
                                     ]}
-                                    onPress={() => setCategory(cat.id)}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 1 }}
                                 >
-                                    <LinearGradient
-                                        colors={cat.gradient}
-                                        style={[
-                                            styles.categoryIcon,
-                                            category === cat.id && styles.categoryIconActive
-                                        ]}
-                                        start={{ x: 0, y: 0 }}
-                                        end={{ x: 1, y: 1 }}
-                                    >
-                                        <Ionicons name={cat.icon} size={18} color="#fff" />
-                                    </LinearGradient>
-                                    <Text style={[
-                                        styles.categoryText,
-                                        category === cat.id && styles.categoryTextActive
-                                    ]}>
-                                        {cat.name}
-                                    </Text>
-                                </TouchableOpacity>
-                            ))}
-                        </View>
+                                    <Ionicons name={cat.icon} size={18} color="#fff" />
+                                </LinearGradient>
+                                <Text style={[
+                                    styles.categoryText,
+                                    category === cat.id && styles.categoryTextActive
+                                ]}>
+                                    {cat.name}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
                     </ScrollView>
                 </View>
 
@@ -333,8 +347,9 @@ const AddBill = () => {
                         <DateTimePicker
                             value={dueDate}
                             mode="date"
-                            display={isDark ? "spinner" : "default"}
+                            display="default"
                             onChange={onDateChange}
+                            minimumDate={new Date()}
                             themeVariant={isDark ? "dark" : "light"}
                         />
                     )}
@@ -353,7 +368,9 @@ const AddBill = () => {
                         </LinearGradient>
                         <View>
                             <Text style={styles.switchText}>Recurring Bill</Text>
-                            <Text style={styles.switchSubtitle}>Repeat monthly</Text>
+                            <Text style={styles.switchSubtitle}>
+                                {isRecurring ? 'Will repeat monthly' : 'One-time bill'}
+                            </Text>
                         </View>
                     </View>
                     <TouchableOpacity
@@ -387,17 +404,17 @@ const AddBill = () => {
                         multiline
                         numberOfLines={4}
                         textAlignVertical="top"
+                        maxLength={200}
                     />
+                    <Text style={styles.charCount}>
+                        {notes.length}/200
+                    </Text>
                 </View>
 
                 {/* Add Bill Button */}
                 <TouchableOpacity
-                    style={[
-                        styles.button,
-                        (!billName || !amount || !category || isLoading) && styles.buttonDisabled
-                    ]}
+                    style={styles.button}
                     onPress={handleAddBill}
-                    disabled={!billName || !amount || !category || isLoading}
                 >
                     <LinearGradient
                         colors={colors.gradient}
@@ -406,7 +423,7 @@ const AddBill = () => {
                         style={styles.buttonGradient}
                     >
                         {isLoading ? (
-                            <Ionicons name="refresh" size={22} color="#fff" />
+                            <Ionicons name="refresh" size={22} color="#fff" style={styles.loadingIcon} />
                         ) : (
                             <Ionicons name="add-circle" size={22} color="#fff" />
                         )}
@@ -420,8 +437,7 @@ const AddBill = () => {
     );
 };
 
-// Update createStyles to accept currency parameter
-const createStyles = (colors, isDark, currency) => StyleSheet.create({
+const createStyles = (colors, isDark) => StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: colors.background,
@@ -479,17 +495,8 @@ const createStyles = (colors, isDark, currency) => StyleSheet.create({
     amountContainer: {
         marginBottom: 16,
     },
-    currencySymbol: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: colors.textPrimary,
-        position: 'absolute',
-        left: 18,
-        top: 18,
-        zIndex: 1,
-    },
     amountInput: {
-        paddingLeft: currency === 'NPR' ? 42 : 40,
+        // Normal input styling
     },
     quickAmounts: {
         marginTop: 8,
@@ -528,8 +535,7 @@ const createStyles = (colors, isDark, currency) => StyleSheet.create({
     categoriesScroll: {
         marginHorizontal: -20,
     },
-    categoriesContainer: {
-        flexDirection: 'row',
+    categoriesContent: {
         paddingHorizontal: 20,
         gap: 12,
     },
@@ -545,6 +551,7 @@ const createStyles = (colors, isDark, currency) => StyleSheet.create({
         shadowOpacity: 0.05,
         shadowRadius: 8,
         elevation: 2,
+        minWidth: 80,
     },
     categoryButtonActive: {
         borderColor: colors.primary,
@@ -573,6 +580,7 @@ const createStyles = (colors, isDark, currency) => StyleSheet.create({
         fontSize: 12,
         fontWeight: '600',
         color: colors.textSecondary,
+        textAlign: 'center',
     },
     categoryTextActive: {
         color: colors.primary,
@@ -678,6 +686,12 @@ const createStyles = (colors, isDark, currency) => StyleSheet.create({
         minHeight: 100,
         textAlignVertical: 'top',
     },
+    charCount: {
+        fontSize: 12,
+        color: colors.textTertiary,
+        textAlign: 'right',
+        marginTop: 4,
+    },
     button: {
         borderRadius: 20,
         marginBottom: 24,
@@ -686,9 +700,6 @@ const createStyles = (colors, isDark, currency) => StyleSheet.create({
         shadowOpacity: 0.4,
         shadowRadius: 16,
         elevation: 8,
-    },
-    buttonDisabled: {
-        opacity: 0.6,
     },
     buttonGradient: {
         flexDirection: 'row',
@@ -702,6 +713,9 @@ const createStyles = (colors, isDark, currency) => StyleSheet.create({
         fontSize: 18,
         fontWeight: '700',
         marginLeft: 8,
+    },
+    loadingIcon: {
+        transform: [{ rotate: '0deg' }],
     },
 });
 
