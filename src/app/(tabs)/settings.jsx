@@ -21,6 +21,7 @@ import { db } from "../../firebase/config";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from "../../contexts/ThemeContext";
 import { useCurrency } from "../../contexts/CurrencyContext";
+import { useNotifications } from "../../contexts/NotificationContext";
 
 // Theme colors
 const lightColors = {
@@ -36,6 +37,9 @@ const lightColors = {
     gradient: ['#6366F1', '#8B5CF6'],
     shadow: '#000',
     disabled: '#F9FAFB',
+    success: '#10B981',
+    warning: '#F59E0B',
+    error: '#EF4444',
 };
 
 const darkColors = {
@@ -51,6 +55,9 @@ const darkColors = {
     gradient: ['#818cf8', '#a78bfa'],
     shadow: '#000',
     disabled: '#1e293b',
+    success: '#34D399',
+    warning: '#FBBF24',
+    error: '#F87171',
 };
 
 // Create styles based on theme
@@ -155,6 +162,12 @@ const createStyles = (isDark) => {
         helperText: {
             fontSize: 12,
             color: colors.textSecondary,
+            marginTop: 4,
+            marginLeft: 4,
+        },
+        errorText: {
+            fontSize: 12,
+            color: colors.error,
             marginTop: 4,
             marginLeft: 4,
         },
@@ -333,6 +346,34 @@ const createStyles = (isDark) => {
             color: colors.textSecondary,
             lineHeight: 20,
         },
+        notificationSettings: {
+            backgroundColor: colors.surface,
+            padding: 20,
+            borderRadius: 16,
+            marginBottom: 16,
+            shadowColor: colors.shadow,
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.1,
+            shadowRadius: 8,
+            elevation: 2,
+        },
+        testNotificationButton: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 12,
+            borderRadius: 8,
+            borderWidth: 1,
+            borderColor: colors.primary,
+            backgroundColor: colors.primaryLight,
+            gap: 8,
+            marginTop: 12,
+        },
+        testNotificationText: {
+            fontSize: 14,
+            fontWeight: '600',
+            color: colors.primary,
+        },
         appInfo: {
             alignItems: 'center',
             padding: 40,
@@ -464,7 +505,7 @@ const CurrencyModal = ({ visible, onClose, currentCurrency, onCurrencySelect, is
     );
 };
 
-// Separate ProfileTab component to prevent re-renders
+// Profile Tab Component
 const ProfileTab = ({ user, onProfileUpdate, isDark }) => {
     const styles = createStyles(isDark);
     const [profileData, setProfileData] = useState({
@@ -472,6 +513,7 @@ const ProfileTab = ({ user, onProfileUpdate, isDark }) => {
         email: '',
     });
     const [loading, setLoading] = useState(false);
+    const [errors, setErrors] = useState({});
 
     useEffect(() => {
         if (user) {
@@ -482,9 +524,23 @@ const ProfileTab = ({ user, onProfileUpdate, isDark }) => {
         }
     }, [user]);
 
-    const handleProfileUpdate = async () => {
+    const validateForm = () => {
+        const newErrors = {};
+
         if (!profileData.displayName.trim()) {
-            Alert.alert('Error', 'Please enter your name');
+            newErrors.displayName = 'Please enter your name';
+        }
+
+        if (profileData.displayName.length > 50) {
+            newErrors.displayName = 'Name must be less than 50 characters';
+        }
+
+        setErrors(newErrors);
+        return Object.keys(newErrors).length === 0;
+    };
+
+    const handleProfileUpdate = async () => {
+        if (!validateForm()) {
             return;
         }
 
@@ -492,6 +548,7 @@ const ProfileTab = ({ user, onProfileUpdate, isDark }) => {
         try {
             await onProfileUpdate(profileData);
             Alert.alert('Success', 'Profile updated successfully!');
+            setErrors({});
         } catch (error) {
             console.error('Error updating profile:', error);
             Alert.alert('Error', 'Failed to update profile. Please try again.');
@@ -507,13 +564,26 @@ const ProfileTab = ({ user, onProfileUpdate, isDark }) => {
             <View style={styles.inputGroup}>
                 <Text style={styles.label}>Full Name</Text>
                 <TextInput
-                    style={styles.input}
+                    style={[styles.input, errors.displayName && { borderColor: isDark ? darkColors.error : lightColors.error }]}
                     placeholder="Enter your full name"
                     placeholderTextColor={isDark ? darkColors.textTertiary : lightColors.textTertiary}
                     value={profileData.displayName}
-                    onChangeText={(text) => setProfileData(prev => ({ ...prev, displayName: text }))}
+                    onChangeText={(text) => {
+                        setProfileData(prev => ({ ...prev, displayName: text }));
+                        if (errors.displayName) {
+                            setErrors(prev => ({ ...prev, displayName: '' }));
+                        }
+                    }}
                     returnKeyType="done"
+                    maxLength={50}
                 />
+                {errors.displayName ? (
+                    <Text style={styles.errorText}>{errors.displayName}</Text>
+                ) : (
+                    <Text style={styles.helperText}>
+                        {50 - profileData.displayName.length} characters remaining
+                    </Text>
+                )}
             </View>
 
             <View style={styles.inputGroup}>
@@ -553,15 +623,23 @@ const ProfileTab = ({ user, onProfileUpdate, isDark }) => {
     );
 };
 
-// Separate AppearanceTab component to prevent re-renders
+// Appearance Tab Component
 const AppearanceTab = ({ isDark, onThemeChange }) => {
     const styles = createStyles(isDark);
     const { currency, updateCurrency, formatCurrency, getSupportedCurrencies } = useCurrency();
+    const {
+        notificationsEnabled,
+        toggleNotifications,
+        requestPermissions,
+        scheduleTestNotification
+    } = useNotifications();
+
     const [appearance, setAppearance] = useState({
         theme: isDark ? 'dark' : 'light',
-        notifications: true,
+        notifications: notificationsEnabled,
     });
     const [showCurrencyModal, setShowCurrencyModal] = useState(false);
+    const [testingNotification, setTestingNotification] = useState(false);
 
     // Popular currencies for quick selection
     const popularCurrencies = ['USD', 'EUR', 'GBP', 'NPR', 'JPY', 'CAD'];
@@ -571,17 +649,7 @@ const AppearanceTab = ({ isDark, onThemeChange }) => {
     }, []);
 
     const loadAppearanceSettings = async () => {
-        try {
-            const savedNotifications = await AsyncStorage.getItem('notifications_enabled');
-            if (savedNotifications !== null) {
-                setAppearance(prev => ({
-                    ...prev,
-                    notifications: savedNotifications === 'true'
-                }));
-            }
-        } catch (error) {
-            console.error('Error loading appearance settings:', error);
-        }
+        // Load any other appearance settings if needed
     };
 
     const handleThemeChange = async (theme) => {
@@ -595,16 +663,40 @@ const AppearanceTab = ({ isDark, onThemeChange }) => {
     };
 
     const handleNotificationsChange = async (value) => {
-        setAppearance(prev => ({ ...prev, notifications: value }));
-        try {
-            await AsyncStorage.setItem('notifications_enabled', value.toString());
-        } catch (error) {
-            console.error('Error saving notification settings:', error);
+        if (value) {
+            // Request permissions when enabling notifications
+            const granted = await requestPermissions();
+            if (!granted) {
+                Alert.alert(
+                    'Permissions Required',
+                    'Please enable notifications in your device settings to receive bill reminders.',
+                    [
+                        { text: 'Cancel', style: 'cancel' },
+                        { text: 'Open Settings', onPress: () => {} } // You can add deep linking to settings here
+                    ]
+                );
+                return;
+            }
         }
+
+        setAppearance(prev => ({ ...prev, notifications: value }));
+        await toggleNotifications(value);
     };
 
     const handleCurrencyChange = async (newCurrency) => {
         await updateCurrency(newCurrency);
+    };
+
+    const handleTestNotification = async () => {
+        setTestingNotification(true);
+        try {
+            await scheduleTestNotification();
+            Alert.alert('Success', 'Test notification sent! Check your notifications.');
+        } catch (error) {
+            Alert.alert('Error', 'Failed to send test notification. Please try again.');
+        } finally {
+            setTestingNotification(false);
+        }
     };
 
     // Update local state when theme changes from outside
@@ -614,6 +706,14 @@ const AppearanceTab = ({ isDark, onThemeChange }) => {
             theme: isDark ? 'dark' : 'light'
         }));
     }, [isDark]);
+
+    // Sync with notification context
+    useEffect(() => {
+        setAppearance(prev => ({
+            ...prev,
+            notifications: notificationsEnabled
+        }));
+    }, [notificationsEnabled]);
 
     return (
         <View style={styles.tabContent}>
@@ -715,22 +815,45 @@ const AppearanceTab = ({ isDark, onThemeChange }) => {
                 </TouchableOpacity>
             </View>
 
-            <Text style={styles.sectionTitle}>Preferences</Text>
+            <Text style={styles.sectionTitle}>Notifications</Text>
 
-            <View style={styles.switchContainer}>
-                <View style={styles.switchText}>
-                    <Text style={styles.switchTitle}>Push Notifications</Text>
-                    <Text style={styles.switchDescription}>
-                        Receive bill reminders and important updates
-                    </Text>
+            <View style={styles.notificationSettings}>
+                <View style={styles.settingInfo}>
+                    <Ionicons name="notifications-outline" size={24} color={isDark ? darkColors.primary : lightColors.primary} />
+                    <View style={styles.settingText}>
+                        <Text style={styles.settingTitle}>Push Notifications</Text>
+                        <Text style={styles.settingDescription}>
+                            Receive bill reminders and important updates
+                        </Text>
+                    </View>
                 </View>
+
                 <Switch
                     value={appearance.notifications}
                     onValueChange={handleNotificationsChange}
                     trackColor={{ false: isDark ? '#334155' : '#D1D5DB', true: isDark ? '#818cf8' : '#6366F1' }}
                     thumbColor={appearance.notifications ? '#fff' : '#f3f4f6'}
                 />
+
+                {appearance.notifications && (
+                    <TouchableOpacity
+                        style={styles.testNotificationButton}
+                        onPress={handleTestNotification}
+                        disabled={testingNotification}
+                    >
+                        {testingNotification ? (
+                            <ActivityIndicator size="small" color={isDark ? darkColors.primary : lightColors.primary} />
+                        ) : (
+                            <Ionicons name="notifications" size={16} color={isDark ? darkColors.primary : lightColors.primary} />
+                        )}
+                        <Text style={styles.testNotificationText}>
+                            {testingNotification ? 'Sending Test...' : 'Send Test Notification'}
+                        </Text>
+                    </TouchableOpacity>
+                )}
             </View>
+
+            <Text style={styles.sectionTitle}>Preferences</Text>
 
             <View style={styles.preferenceItem}>
                 <Ionicons name="language-outline" size={20} color={isDark ? darkColors.textSecondary : lightColors.textSecondary} />
@@ -742,6 +865,12 @@ const AppearanceTab = ({ isDark, onThemeChange }) => {
             <View style={styles.preferenceItem}>
                 <Ionicons name="help-circle-outline" size={20} color={isDark ? darkColors.textSecondary : lightColors.textSecondary} />
                 <Text style={styles.preferenceText}>Help & Support</Text>
+                <Ionicons name="chevron-forward" size={20} color={isDark ? darkColors.textTertiary : lightColors.textTertiary} />
+            </View>
+
+            <View style={styles.preferenceItem}>
+                <Ionicons name="shield-checkmark-outline" size={20} color={isDark ? darkColors.textSecondary : lightColors.textSecondary} />
+                <Text style={styles.preferenceText}>Privacy Policy</Text>
                 <Ionicons name="chevron-forward" size={20} color={isDark ? darkColors.textTertiary : lightColors.textTertiary} />
             </View>
 
@@ -841,8 +970,8 @@ const Settings = () => {
                     <Text style={styles.appVersion}>BillTracker Pro v1.0.0</Text>
                     <Text style={styles.appCopyright}>© 2025 BillTracker Pro. All rights reserved.</Text>
                 </View>
+                <View style={styles.bottomPadding} />
             </ScrollView>
-            <View style={styles.bottomPadding} />
         </View>
     );
 };

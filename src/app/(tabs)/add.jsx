@@ -1,5 +1,5 @@
 // src/app/(tabs)/add.jsx
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Animated, Alert, Dimensions } from "react-native";
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Animated, Alert, Dimensions, Switch, Modal } from "react-native";
 import React, { useState, useRef } from "react";
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,6 +10,7 @@ import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { useRouter } from "expo-router";
 import { useTheme } from "../../contexts/ThemeContext";
 import { useCurrency } from "../../contexts/CurrencyContext";
+import { useNotifications } from "../../contexts/NotificationContext";
 
 const { width } = Dimensions.get('window');
 
@@ -26,6 +27,7 @@ const lightColors = {
     gradient: ['#6366F1', '#8B5CF6'],
     shadow: '#000',
     danger: '#EF4444',
+    success: '#10B981',
 };
 
 const darkColors = {
@@ -40,20 +42,177 @@ const darkColors = {
     gradient: ['#818cf8', '#a78bfa'],
     shadow: '#000',
     danger: '#F87171',
+    success: '#34D399',
+};
+
+// Time Picker Modal Component
+const TimePickerModal = ({ visible, onClose, currentTime, onTimeSelect, isDark }) => {
+    const colors = isDark ? darkColors : lightColors;
+
+    const [selectedTime, setSelectedTime] = useState(() => {
+        // Convert current time string to Date object
+        const [hours, minutes] = currentTime.split(':').map(Number);
+        const date = new Date();
+        date.setHours(hours, minutes, 0, 0);
+        return date;
+    });
+
+    const styles = StyleSheet.create({
+        modalOverlay: {
+            flex: 1,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: 20,
+        },
+        modalContent: {
+            width: '100%',
+            maxWidth: 400,
+            backgroundColor: colors.surface,
+            borderRadius: 20,
+            padding: 20,
+        },
+        modalHeader: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: 20,
+        },
+        modalTitle: {
+            fontSize: 20,
+            fontWeight: '700',
+            color: colors.textPrimary,
+        },
+        timePickerContainer: {
+            alignItems: 'center',
+            marginBottom: 20,
+        },
+        selectedTimeDisplay: {
+            fontSize: 24,
+            fontWeight: '700',
+            color: colors.primary,
+            marginBottom: 20,
+        },
+        timePeriod: {
+            fontSize: 16,
+            color: colors.textSecondary,
+            fontWeight: '600',
+        },
+        buttonContainer: {
+            flexDirection: 'row',
+            gap: 12,
+        },
+        button: {
+            flex: 1,
+            borderRadius: 12,
+            padding: 16,
+            alignItems: 'center',
+        },
+        cancelButton: {
+            backgroundColor: isDark ? '#334155' : '#F3F4F6',
+        },
+        saveButton: {
+            backgroundColor: colors.primary,
+        },
+        buttonText: {
+            fontSize: 16,
+            fontWeight: '600',
+        },
+        cancelButtonText: {
+            color: colors.textPrimary,
+        },
+        saveButtonText: {
+            color: '#fff',
+        },
+    });
+
+    const handleTimeChange = (event, newTime) => {
+        if (newTime) {
+            setSelectedTime(newTime);
+        }
+    };
+
+    const handleSave = () => {
+        const hours = selectedTime.getHours().toString().padStart(2, '0');
+        const minutes = selectedTime.getMinutes().toString().padStart(2, '0');
+        onTimeSelect(`${hours}:${minutes}`);
+        onClose();
+    };
+
+    const formatTimeDisplay = (date) => {
+        const hours = date.getHours();
+        const minutes = date.getMinutes().toString().padStart(2, '0');
+        const period = hours >= 12 ? 'PM' : 'AM';
+        const displayHours = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
+        return `${displayHours}:${minutes} ${period}`;
+    };
+
+    return (
+        <Modal
+            visible={visible}
+            transparent={true}
+            animationType="slide"
+            onRequestClose={onClose}
+        >
+            <View style={styles.modalOverlay}>
+                <View style={styles.modalContent}>
+                    <View style={styles.modalHeader}>
+                        <Text style={styles.modalTitle}>Select Reminder Time</Text>
+                        <TouchableOpacity onPress={onClose}>
+                            <Ionicons name="close" size={24} color={colors.textSecondary} />
+                        </TouchableOpacity>
+                    </View>
+
+                    <View style={styles.timePickerContainer}>
+                        <Text style={styles.selectedTimeDisplay}>
+                            {formatTimeDisplay(selectedTime)}
+                        </Text>
+                        <DateTimePicker
+                            value={selectedTime}
+                            mode="time"
+                            display="spinner"
+                            onChange={handleTimeChange}
+                            themeVariant={isDark ? "dark" : "light"}
+                            style={styles.timePicker}
+                        />
+                    </View>
+
+                    <View style={styles.buttonContainer}>
+                        <TouchableOpacity
+                            style={[styles.button, styles.cancelButton]}
+                            onPress={onClose}
+                        >
+                            <Text style={[styles.buttonText, styles.cancelButtonText]}>Cancel</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[styles.button, styles.saveButton]}
+                            onPress={handleSave}
+                        >
+                            <Text style={[styles.buttonText, styles.saveButtonText]}>Save Time</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </View>
+        </Modal>
+    );
 };
 
 const AddBill = () => {
     const { user } = useAuth();
     const { isDark } = useTheme();
     const { currency, formatCurrency } = useCurrency();
+    const { notificationsEnabled, scheduleBillReminder } = useNotifications();
     const router = useRouter();
     const [billName, setBillName] = useState('');
     const [amount, setAmount] = useState('');
     const [category, setCategory] = useState('');
     const [dueDate, setDueDate] = useState(new Date());
     const [showDatePicker, setShowDatePicker] = useState(false);
+    const [reminderTime, setReminderTime] = useState('09:00'); // Default reminder time
+    const [showTimePicker, setShowTimePicker] = useState(false);
     const [notes, setNotes] = useState('');
     const [isRecurring, setIsRecurring] = useState(false);
+    const [enableReminders, setEnableReminders] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
 
     const colors = isDark ? darkColors : lightColors;
@@ -83,6 +242,14 @@ const AddBill = () => {
             })
         ]).start();
     }, []);
+
+    // Auto-enable reminders when due date is set (which it always is by default)
+    React.useEffect(() => {
+        // Always enable reminders if notifications are globally enabled and we have a due date
+        if (notificationsEnabled && dueDate) {
+            setEnableReminders(true);
+        }
+    }, [notificationsEnabled, dueDate]);
 
     const categories = [
         { id: 'electricity', name: 'Electricity', icon: 'flash', color: '#F59E0B', gradient: ['#F59E0B', '#D97706'] },
@@ -116,14 +283,21 @@ const AddBill = () => {
         setIsLoading(true);
 
         try {
+            // Create due date with reminder time
+            const dueDateWithTime = new Date(dueDate);
+            const [hours, minutes] = reminderTime.split(':').map(Number);
+            dueDateWithTime.setHours(hours, minutes, 0, 0);
+
             const billData = {
                 name: billName.trim(),
                 amount: amountValue,
                 category,
-                dueDate: dueDate.toISOString().split('T')[0],
-                dueTimestamp: dueDate,
+                dueDate: dueDate.toISOString().split('T')[0], // Date only for display
+                dueTimestamp: dueDateWithTime, // Full timestamp with time for notifications
+                reminderTime: reminderTime,
                 notes: notes.trim(),
                 isRecurring,
+                enableReminders: enableReminders && notificationsEnabled, // Only enable if globally enabled
                 status: 'pending',
                 userId: user.uid,
                 createdAt: serverTimestamp(),
@@ -132,9 +306,17 @@ const AddBill = () => {
 
             const docRef = await addDoc(collection(db, 'bills'), billData);
 
+            // Schedule notification if reminders are enabled
+            if (enableReminders && notificationsEnabled) {
+                await scheduleBillReminder({
+                    ...billData,
+                    id: docRef.id
+                });
+            }
+
             Alert.alert(
                 'Success! 🎉',
-                `"${billData.name}" has been added successfully.`,
+                `"${billData.name}" has been added successfully.${enableReminders && notificationsEnabled ? `\n\nYou'll be reminded on ${formatDate(dueDate)} at ${formatTimeDisplay(reminderTime)}` : ''}`,
                 [
                     {
                         text: 'Add Another',
@@ -161,8 +343,10 @@ const AddBill = () => {
         setAmount('');
         setCategory('');
         setDueDate(new Date());
+        setReminderTime('09:00');
         setNotes('');
         setIsRecurring(false);
+        setEnableReminders(notificationsEnabled);
     };
 
     const formatDate = (date) => {
@@ -171,6 +355,13 @@ const AddBill = () => {
             day: 'numeric',
             year: 'numeric'
         });
+    };
+
+    const formatTimeDisplay = (timeValue) => {
+        const [hours, minutes] = timeValue.split(':').map(Number);
+        const period = hours >= 12 ? 'PM' : 'AM';
+        const displayHours = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
+        return `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
     };
 
     const onDateChange = (event, selectedDate) => {
@@ -355,6 +546,28 @@ const AddBill = () => {
                     )}
                 </View>
 
+                {/* Reminder Time */}
+                <View style={styles.inputGroup}>
+                    <Text style={styles.label}>Reminder Time</Text>
+                    <TouchableOpacity
+                        style={styles.dateButton}
+                        onPress={() => setShowTimePicker(true)}
+                    >
+                        <LinearGradient
+                            colors={colors.gradient}
+                            style={styles.dateIcon}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                        >
+                            <Ionicons name="time-outline" size={18} color="#fff" />
+                        </LinearGradient>
+                        <Text style={styles.dateText}>
+                            {formatTimeDisplay(reminderTime)}
+                        </Text>
+                        <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
+                    </TouchableOpacity>
+                </View>
+
                 {/* Recurring Bill */}
                 <View style={styles.switchGroup}>
                     <View style={styles.switchLabel}>
@@ -392,6 +605,49 @@ const AddBill = () => {
                     </TouchableOpacity>
                 </View>
 
+                {/* Notification Reminders - Always enabled when due date exists */}
+                <View style={styles.switchGroup}>
+                    <View style={styles.switchLabel}>
+                        <LinearGradient
+                            colors={enableReminders ? colors.gradient : isDark ? ['#64748b', '#475569'] : ['#9CA3AF', '#6B7280']}
+                            style={styles.switchIcon}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                        >
+                            <Ionicons
+                                name={enableReminders ? "notifications" : "notifications-off"}
+                                size={18}
+                                color="#fff"
+                            />
+                        </LinearGradient>
+                        <View>
+                            <Text style={styles.switchText}>Enable Reminders</Text>
+                            <Text style={styles.switchSubtitle}>
+                                {enableReminders ?
+                                    `Get reminded on ${formatDate(dueDate)} at ${formatTimeDisplay(reminderTime)}` :
+                                    'No reminders for this bill'
+                                }
+                            </Text>
+                        </View>
+                    </View>
+                    <Switch
+                        value={enableReminders}
+                        onValueChange={setEnableReminders}
+                        trackColor={{ false: isDark ? '#334155' : '#D1D5DB', true: isDark ? '#818cf8' : '#6366F1' }}
+                        thumbColor={enableReminders ? '#fff' : '#f3f4f6'}
+                        disabled={!notificationsEnabled}
+                    />
+                </View>
+
+                {!notificationsEnabled && (
+                    <View style={styles.notificationWarning}>
+                        <Ionicons name="information-circle" size={16} color={colors.textSecondary} />
+                        <Text style={styles.notificationWarningText}>
+                            Enable notifications in Settings to receive bill reminders
+                        </Text>
+                    </View>
+                )}
+
                 {/* Notes */}
                 <View style={styles.inputGroup}>
                     <Text style={styles.label}>Notes (Optional)</Text>
@@ -415,6 +671,7 @@ const AddBill = () => {
                 <TouchableOpacity
                     style={styles.button}
                     onPress={handleAddBill}
+                    disabled={isLoading}
                 >
                     <LinearGradient
                         colors={colors.gradient}
@@ -432,6 +689,15 @@ const AddBill = () => {
                         </Text>
                     </LinearGradient>
                 </TouchableOpacity>
+
+                {/* Time Picker Modal */}
+                <TimePickerModal
+                    visible={showTimePicker}
+                    onClose={() => setShowTimePicker(false)}
+                    currentTime={reminderTime}
+                    onTimeSelect={setReminderTime}
+                    isDark={isDark}
+                />
             </Animated.View>
         </ScrollView>
     );
@@ -618,7 +884,7 @@ const createStyles = (colors, isDark) => StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 28,
+        marginBottom: 16,
         padding: 20,
         backgroundColor: colors.surface,
         borderRadius: 16,
@@ -681,6 +947,21 @@ const createStyles = (colors, isDark) => StyleSheet.create({
     },
     toggleCircleActive: {
         transform: [{ translateX: 24 }],
+    },
+    notificationWarning: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: isDark ? 'rgba(100, 116, 139, 0.2)' : 'rgba(156, 163, 175, 0.2)',
+        padding: 12,
+        borderRadius: 12,
+        marginBottom: 28,
+        gap: 8,
+    },
+    notificationWarningText: {
+        fontSize: 14,
+        color: colors.textSecondary,
+        fontWeight: '500',
+        flex: 1,
     },
     textArea: {
         minHeight: 100,

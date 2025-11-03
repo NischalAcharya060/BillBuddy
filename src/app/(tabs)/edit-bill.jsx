@@ -1,5 +1,5 @@
 // src/app/(tabs)/edit-bill.jsx
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Animated, Alert, ActivityIndicator, Dimensions } from "react-native";
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Animated, Alert, ActivityIndicator, Dimensions, Switch, Modal } from "react-native";
 import React, { useState, useRef, useEffect } from "react";
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,7 +9,8 @@ import { db } from "../../firebase/config";
 import { doc, getDoc, updateDoc, deleteDoc } from "firebase/firestore";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useTheme } from "../../contexts/ThemeContext";
-import { useCurrency } from "../../contexts/CurrencyContext"; // Add currency context
+import { useCurrency } from "../../contexts/CurrencyContext";
+import { useNotifications } from "../../contexts/NotificationContext";
 
 const { width } = Dimensions.get('window');
 
@@ -46,25 +47,181 @@ const darkColors = {
     dangerGradient: ['#F87171', '#EF4444'],
 };
 
+// Time Picker Modal Component
+const TimePickerModal = ({ visible, onClose, currentTime, onTimeSelect, isDark }) => {
+    const colors = isDark ? darkColors : lightColors;
+
+    const [selectedTime, setSelectedTime] = useState(() => {
+        // Convert current time string to Date object
+        const [hours, minutes] = currentTime.split(':').map(Number);
+        const date = new Date();
+        date.setHours(hours, minutes, 0, 0);
+        return date;
+    });
+
+    const styles = StyleSheet.create({
+        modalOverlay: {
+            flex: 1,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: 20,
+        },
+        modalContent: {
+            width: '100%',
+            maxWidth: 400,
+            backgroundColor: colors.surface,
+            borderRadius: 20,
+            padding: 20,
+        },
+        modalHeader: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: 20,
+        },
+        modalTitle: {
+            fontSize: 20,
+            fontWeight: '700',
+            color: colors.textPrimary,
+        },
+        timePickerContainer: {
+            alignItems: 'center',
+            marginBottom: 20,
+        },
+        selectedTimeDisplay: {
+            fontSize: 24,
+            fontWeight: '700',
+            color: colors.primary,
+            marginBottom: 20,
+        },
+        timePeriod: {
+            fontSize: 16,
+            color: colors.textSecondary,
+            fontWeight: '600',
+        },
+        buttonContainer: {
+            flexDirection: 'row',
+            gap: 12,
+        },
+        button: {
+            flex: 1,
+            borderRadius: 12,
+            padding: 16,
+            alignItems: 'center',
+        },
+        cancelButton: {
+            backgroundColor: isDark ? '#334155' : '#F3F4F6',
+        },
+        saveButton: {
+            backgroundColor: colors.primary,
+        },
+        buttonText: {
+            fontSize: 16,
+            fontWeight: '600',
+        },
+        cancelButtonText: {
+            color: colors.textPrimary,
+        },
+        saveButtonText: {
+            color: '#fff',
+        },
+    });
+
+    const handleTimeChange = (event, newTime) => {
+        if (newTime) {
+            setSelectedTime(newTime);
+        }
+    };
+
+    const handleSave = () => {
+        const hours = selectedTime.getHours().toString().padStart(2, '0');
+        const minutes = selectedTime.getMinutes().toString().padStart(2, '0');
+        onTimeSelect(`${hours}:${minutes}`);
+        onClose();
+    };
+
+    const formatTimeDisplay = (date) => {
+        const hours = date.getHours();
+        const minutes = date.getMinutes().toString().padStart(2, '0');
+        const period = hours >= 12 ? 'PM' : 'AM';
+        const displayHours = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
+        return `${displayHours}:${minutes} ${period}`;
+    };
+
+    return (
+        <Modal
+            visible={visible}
+            transparent={true}
+            animationType="slide"
+            onRequestClose={onClose}
+        >
+            <View style={styles.modalOverlay}>
+                <View style={styles.modalContent}>
+                    <View style={styles.modalHeader}>
+                        <Text style={styles.modalTitle}>Select Reminder Time</Text>
+                        <TouchableOpacity onPress={onClose}>
+                            <Ionicons name="close" size={24} color={colors.textSecondary} />
+                        </TouchableOpacity>
+                    </View>
+
+                    <View style={styles.timePickerContainer}>
+                        <Text style={styles.selectedTimeDisplay}>
+                            {formatTimeDisplay(selectedTime)}
+                        </Text>
+                        <DateTimePicker
+                            value={selectedTime}
+                            mode="time"
+                            display="spinner"
+                            onChange={handleTimeChange}
+                            themeVariant={isDark ? "dark" : "light"}
+                            style={styles.timePicker}
+                        />
+                    </View>
+
+                    <View style={styles.buttonContainer}>
+                        <TouchableOpacity
+                            style={[styles.button, styles.cancelButton]}
+                            onPress={onClose}
+                        >
+                            <Text style={[styles.buttonText, styles.cancelButtonText]}>Cancel</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[styles.button, styles.saveButton]}
+                            onPress={handleSave}
+                        >
+                            <Text style={[styles.buttonText, styles.saveButtonText]}>Save Time</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </View>
+        </Modal>
+    );
+};
+
 const EditBill = () => {
     const { billId } = useLocalSearchParams();
     const router = useRouter();
     const { user } = useAuth();
     const { isDark } = useTheme();
-    const { currency, symbol } = useCurrency(); // Add currency hook
+    const { currency, formatCurrency } = useCurrency();
+    const { notificationsEnabled, scheduleBillReminder, cancelBillReminder } = useNotifications();
 
     const [billName, setBillName] = useState('');
     const [amount, setAmount] = useState('');
     const [category, setCategory] = useState('');
     const [dueDate, setDueDate] = useState(new Date());
     const [showDatePicker, setShowDatePicker] = useState(false);
+    const [reminderTime, setReminderTime] = useState('09:00');
+    const [showTimePicker, setShowTimePicker] = useState(false);
     const [notes, setNotes] = useState('');
     const [isRecurring, setIsRecurring] = useState(false);
+    const [enableReminders, setEnableReminders] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
 
     const colors = isDark ? darkColors : lightColors;
-    const styles = createStyles(colors, isDark, currency); // Pass currency to createStyles
+    const styles = createStyles(colors, isDark);
 
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(30)).current;
@@ -119,8 +276,10 @@ const EditBill = () => {
                 setAmount(billData.amount.toString());
                 setCategory(billData.category || 'other');
                 setDueDate(billData.dueTimestamp?.toDate() || new Date(billData.dueDate));
+                setReminderTime(billData.reminderTime || '09:00');
                 setNotes(billData.notes || '');
                 setIsRecurring(billData.isRecurring || false);
+                setEnableReminders(billData.enableReminders || false);
             } else {
                 Alert.alert('Error', 'Bill not found');
                 router.back();
@@ -148,22 +307,42 @@ const EditBill = () => {
         setIsSaving(true);
 
         try {
+            // Create due date with reminder time
+            const dueDateWithTime = new Date(dueDate);
+            const [hours, minutes] = reminderTime.split(':').map(Number);
+            dueDateWithTime.setHours(hours, minutes, 0, 0);
+
             const billData = {
                 name: billName.trim(),
                 amount: parseFloat(amount),
                 category,
                 dueDate: dueDate.toISOString().split('T')[0],
-                dueTimestamp: dueDate,
+                dueTimestamp: dueDateWithTime,
+                reminderTime: reminderTime,
                 notes: notes.trim(),
                 isRecurring,
+                enableReminders: enableReminders && notificationsEnabled,
                 updatedAt: new Date(),
             };
 
             await updateDoc(doc(db, 'bills', billId), billData);
 
+            // Handle notifications
+            if (enableReminders && notificationsEnabled) {
+                // Cancel existing notification and schedule new one
+                await cancelBillReminder(billId);
+                await scheduleBillReminder({
+                    ...billData,
+                    id: billId
+                });
+            } else {
+                // Cancel notification if reminders are disabled
+                await cancelBillReminder(billId);
+            }
+
             Alert.alert(
                 'Success! 🎉',
-                `"${billData.name}" has been updated successfully.`,
+                `"${billData.name}" has been updated successfully.${enableReminders && notificationsEnabled ? `\n\nYou'll be reminded on ${formatDate(dueDate)} at ${formatTimeDisplay(reminderTime)}` : ''}`,
                 [
                     {
                         text: 'OK',
@@ -199,6 +378,8 @@ const EditBill = () => {
 
     const deleteBill = async () => {
         try {
+            // Cancel notification before deleting
+            await cancelBillReminder(billId);
             await deleteDoc(doc(db, 'bills', billId));
             Alert.alert('Success', 'Bill deleted successfully');
             router.back();
@@ -214,6 +395,13 @@ const EditBill = () => {
             day: 'numeric',
             year: 'numeric'
         });
+    };
+
+    const formatTimeDisplay = (timeValue) => {
+        const [hours, minutes] = timeValue.split(':').map(Number);
+        const period = hours >= 12 ? 'PM' : 'AM';
+        const displayHours = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
+        return `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
     };
 
     const onDateChange = (event, selectedDate) => {
@@ -234,7 +422,7 @@ const EditBill = () => {
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
             >
-                <Text style={styles.quickAmountText}>{symbol}{quickAmount}</Text>
+                <Text style={styles.quickAmountText}>{formatCurrency(quickAmount)}</Text>
             </LinearGradient>
         </TouchableOpacity>
     );
@@ -308,6 +496,7 @@ const EditBill = () => {
                         placeholderTextColor={colors.textTertiary}
                         value={billName}
                         onChangeText={setBillName}
+                        maxLength={50}
                     />
                 </View>
 
@@ -317,14 +506,23 @@ const EditBill = () => {
                         Amount <Text style={styles.required}>*</Text>
                     </Text>
                     <View style={styles.amountContainer}>
-                        <Text style={styles.currencySymbol}>{symbol}</Text>
                         <TextInput
                             style={[styles.input, styles.amountInput]}
                             placeholder="0.00"
                             placeholderTextColor={colors.textTertiary}
                             keyboardType="decimal-pad"
                             value={amount}
-                            onChangeText={(text) => setAmount(text.replace(/[^0-9.]/g, ''))}
+                            onChangeText={(text) => {
+                                // Allow only numbers and one decimal point
+                                const formatted = text.replace(/[^0-9.]/g, '');
+                                // Ensure only one decimal point
+                                const parts = formatted.split('.');
+                                if (parts.length > 2) {
+                                    setAmount(parts[0] + '.' + parts.slice(1).join(''));
+                                } else {
+                                    setAmount(formatted);
+                                }
+                            }}
                         />
                     </View>
 
@@ -348,37 +546,36 @@ const EditBill = () => {
                         horizontal
                         showsHorizontalScrollIndicator={false}
                         style={styles.categoriesScroll}
+                        contentContainerStyle={styles.categoriesContent}
                     >
-                        <View style={styles.categoriesContainer}>
-                            {categories.map((cat) => (
-                                <TouchableOpacity
-                                    key={cat.id}
+                        {categories.map((cat) => (
+                            <TouchableOpacity
+                                key={cat.id}
+                                style={[
+                                    styles.categoryButton,
+                                    category === cat.id && styles.categoryButtonActive
+                                ]}
+                                onPress={() => setCategory(cat.id)}
+                            >
+                                <LinearGradient
+                                    colors={cat.gradient}
                                     style={[
-                                        styles.categoryButton,
-                                        category === cat.id && styles.categoryButtonActive
+                                        styles.categoryIcon,
+                                        category === cat.id && styles.categoryIconActive
                                     ]}
-                                    onPress={() => setCategory(cat.id)}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 1 }}
                                 >
-                                    <LinearGradient
-                                        colors={cat.gradient}
-                                        style={[
-                                            styles.categoryIcon,
-                                            category === cat.id && styles.categoryIconActive
-                                        ]}
-                                        start={{ x: 0, y: 0 }}
-                                        end={{ x: 1, y: 1 }}
-                                    >
-                                        <Ionicons name={cat.icon} size={18} color="#fff" />
-                                    </LinearGradient>
-                                    <Text style={[
-                                        styles.categoryText,
-                                        category === cat.id && styles.categoryTextActive
-                                    ]}>
-                                        {cat.name}
-                                    </Text>
-                                </TouchableOpacity>
-                            ))}
-                        </View>
+                                    <Ionicons name={cat.icon} size={18} color="#fff" />
+                                </LinearGradient>
+                                <Text style={[
+                                    styles.categoryText,
+                                    category === cat.id && styles.categoryTextActive
+                                ]}>
+                                    {cat.name}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
                     </ScrollView>
                 </View>
 
@@ -406,11 +603,34 @@ const EditBill = () => {
                         <DateTimePicker
                             value={dueDate}
                             mode="date"
-                            display={isDark ? "spinner" : "default"}
+                            display="default"
                             onChange={onDateChange}
+                            minimumDate={new Date()}
                             themeVariant={isDark ? "dark" : "light"}
                         />
                     )}
+                </View>
+
+                {/* Reminder Time */}
+                <View style={styles.inputGroup}>
+                    <Text style={styles.label}>Reminder Time</Text>
+                    <TouchableOpacity
+                        style={styles.dateButton}
+                        onPress={() => setShowTimePicker(true)}
+                    >
+                        <LinearGradient
+                            colors={colors.gradient}
+                            style={styles.dateIcon}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                        >
+                            <Ionicons name="time-outline" size={18} color="#fff" />
+                        </LinearGradient>
+                        <Text style={styles.dateText}>
+                            {formatTimeDisplay(reminderTime)}
+                        </Text>
+                        <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
+                    </TouchableOpacity>
                 </View>
 
                 {/* Recurring Bill */}
@@ -426,7 +646,9 @@ const EditBill = () => {
                         </LinearGradient>
                         <View>
                             <Text style={styles.switchText}>Recurring Bill</Text>
-                            <Text style={styles.switchSubtitle}>Repeat monthly</Text>
+                            <Text style={styles.switchSubtitle}>
+                                {isRecurring ? 'Will repeat monthly' : 'One-time bill'}
+                            </Text>
                         </View>
                     </View>
                     <TouchableOpacity
@@ -448,6 +670,49 @@ const EditBill = () => {
                     </TouchableOpacity>
                 </View>
 
+                {/* Notification Reminders */}
+                <View style={styles.switchGroup}>
+                    <View style={styles.switchLabel}>
+                        <LinearGradient
+                            colors={enableReminders ? colors.gradient : isDark ? ['#64748b', '#475569'] : ['#9CA3AF', '#6B7280']}
+                            style={styles.switchIcon}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                        >
+                            <Ionicons
+                                name={enableReminders ? "notifications" : "notifications-off"}
+                                size={18}
+                                color="#fff"
+                            />
+                        </LinearGradient>
+                        <View>
+                            <Text style={styles.switchText}>Enable Reminders</Text>
+                            <Text style={styles.switchSubtitle}>
+                                {enableReminders ?
+                                    `Get reminded on ${formatDate(dueDate)} at ${formatTimeDisplay(reminderTime)}` :
+                                    'No reminders for this bill'
+                                }
+                            </Text>
+                        </View>
+                    </View>
+                    <Switch
+                        value={enableReminders}
+                        onValueChange={setEnableReminders}
+                        trackColor={{ false: isDark ? '#334155' : '#D1D5DB', true: isDark ? '#818cf8' : '#6366F1' }}
+                        thumbColor={enableReminders ? '#fff' : '#f3f4f6'}
+                        disabled={!notificationsEnabled}
+                    />
+                </View>
+
+                {!notificationsEnabled && (
+                    <View style={styles.notificationWarning}>
+                        <Ionicons name="information-circle" size={16} color={colors.textSecondary} />
+                        <Text style={styles.notificationWarningText}>
+                            Enable notifications in Settings to receive bill reminders
+                        </Text>
+                    </View>
+                )}
+
                 {/* Notes */}
                 <View style={styles.inputGroup}>
                     <Text style={styles.label}>Notes (Optional)</Text>
@@ -460,7 +725,11 @@ const EditBill = () => {
                         multiline
                         numberOfLines={4}
                         textAlignVertical="top"
+                        maxLength={200}
                     />
+                    <Text style={styles.charCount}>
+                        {notes.length}/200
+                    </Text>
                 </View>
 
                 {/* Save Button */}
@@ -479,7 +748,7 @@ const EditBill = () => {
                         style={styles.buttonGradient}
                     >
                         {isSaving ? (
-                            <Ionicons name="refresh" size={22} color="#fff" />
+                            <Ionicons name="refresh" size={22} color="#fff" style={styles.loadingIcon} />
                         ) : (
                             <Ionicons name="save" size={22} color="#fff" />
                         )}
@@ -504,13 +773,21 @@ const EditBill = () => {
                     </LinearGradient>
                     <Text style={styles.deleteButtonText}>Delete Bill</Text>
                 </TouchableOpacity>
+
+                {/* Time Picker Modal */}
+                <TimePickerModal
+                    visible={showTimePicker}
+                    onClose={() => setShowTimePicker(false)}
+                    currentTime={reminderTime}
+                    onTimeSelect={setReminderTime}
+                    isDark={isDark}
+                />
             </Animated.View>
         </ScrollView>
     );
 };
 
-// Update createStyles to accept currency parameter
-const createStyles = (colors, isDark, currency) => StyleSheet.create({
+const createStyles = (colors, isDark) => StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: colors.background,
@@ -603,17 +880,8 @@ const createStyles = (colors, isDark, currency) => StyleSheet.create({
     amountContainer: {
         marginBottom: 16,
     },
-    currencySymbol: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: colors.textPrimary,
-        position: 'absolute',
-        left: 18,
-        top: 18,
-        zIndex: 1,
-    },
     amountInput: {
-        paddingLeft: currency === 'NPR' ? 42 : 40,
+        // Normal input styling
     },
     quickAmounts: {
         marginTop: 8,
@@ -652,8 +920,7 @@ const createStyles = (colors, isDark, currency) => StyleSheet.create({
     categoriesScroll: {
         marginHorizontal: -20,
     },
-    categoriesContainer: {
-        flexDirection: 'row',
+    categoriesContent: {
         paddingHorizontal: 20,
         gap: 12,
     },
@@ -669,6 +936,7 @@ const createStyles = (colors, isDark, currency) => StyleSheet.create({
         shadowOpacity: 0.05,
         shadowRadius: 8,
         elevation: 2,
+        minWidth: 80,
     },
     categoryButtonActive: {
         borderColor: colors.primary,
@@ -697,6 +965,7 @@ const createStyles = (colors, isDark, currency) => StyleSheet.create({
         fontSize: 12,
         fontWeight: '600',
         color: colors.textSecondary,
+        textAlign: 'center',
     },
     categoryTextActive: {
         color: colors.primary,
@@ -734,7 +1003,7 @@ const createStyles = (colors, isDark, currency) => StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 28,
+        marginBottom: 16,
         padding: 20,
         backgroundColor: colors.surface,
         borderRadius: 16,
@@ -798,9 +1067,30 @@ const createStyles = (colors, isDark, currency) => StyleSheet.create({
     toggleCircleActive: {
         transform: [{ translateX: 24 }],
     },
+    notificationWarning: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: isDark ? 'rgba(100, 116, 139, 0.2)' : 'rgba(156, 163, 175, 0.2)',
+        padding: 12,
+        borderRadius: 12,
+        marginBottom: 28,
+        gap: 8,
+    },
+    notificationWarningText: {
+        fontSize: 14,
+        color: colors.textSecondary,
+        fontWeight: '500',
+        flex: 1,
+    },
     textArea: {
         minHeight: 100,
         textAlignVertical: 'top',
+    },
+    charCount: {
+        fontSize: 12,
+        color: colors.textTertiary,
+        textAlign: 'right',
+        marginTop: 4,
     },
     button: {
         borderRadius: 20,
@@ -826,6 +1116,9 @@ const createStyles = (colors, isDark, currency) => StyleSheet.create({
         fontSize: 18,
         fontWeight: '700',
         marginLeft: 8,
+    },
+    loadingIcon: {
+        transform: [{ rotate: '0deg' }],
     },
     deleteButton: {
         flexDirection: 'row',

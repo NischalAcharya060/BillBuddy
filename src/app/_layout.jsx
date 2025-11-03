@@ -5,6 +5,8 @@ import { AuthProvider, useAuth } from "../contexts/AuthContext";
 import { ActivityIndicator, View } from "react-native";
 import { ThemeProvider } from '../contexts/ThemeContext';
 import { CurrencyProvider } from '../contexts/CurrencyContext';
+import { NotificationProvider } from '../contexts/NotificationContext';
+
 
 
 function RootLayoutNav() {
@@ -74,7 +76,9 @@ export default function RootLayout() {
         <CurrencyProvider>
         <ThemeProvider>
             <AuthProvider>
+                <NotificationProvider>
                 <RootLayoutNav />
+                </NotificationProvider>
             </AuthProvider>
         </ThemeProvider>
         </CurrencyProvider>
