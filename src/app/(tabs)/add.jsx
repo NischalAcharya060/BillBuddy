@@ -11,6 +11,7 @@ import { useRouter } from "expo-router";
 import { useTheme } from "../../contexts/ThemeContext";
 import { useCurrency } from "../../contexts/CurrencyContext";
 import { useNotifications } from "../../contexts/NotificationContext";
+import * as Notifications from 'expo-notifications';
 
 const { width } = Dimensions.get('window');
 
@@ -201,7 +202,12 @@ const AddBill = () => {
     const { user } = useAuth();
     const { isDark } = useTheme();
     const { currency, formatCurrency } = useCurrency();
-    const { notificationsEnabled, scheduleBillReminder } = useNotifications();
+    const {
+        notificationsEnabled,
+        scheduleBillReminder,
+        requestPermissions,
+        scheduleTestNotification
+    } = useNotifications();
     const router = useRouter();
     const [billName, setBillName] = useState('');
     const [amount, setAmount] = useState('');
@@ -214,6 +220,7 @@ const AddBill = () => {
     const [isRecurring, setIsRecurring] = useState(false);
     const [enableReminders, setEnableReminders] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [debugInfo, setDebugInfo] = useState('');
 
     const colors = isDark ? darkColors : lightColors;
     const styles = createStyles(colors, isDark);
@@ -262,6 +269,44 @@ const AddBill = () => {
         { id: 'other', name: 'Other', icon: 'ellipsis-horizontal', color: colors.textTertiary, gradient: isDark ? ['#64748b', '#475569'] : ['#6B7280', '#4B5563'] },
     ];
 
+    // Debug function to check notification status
+    const checkNotificationStatus = async () => {
+        try {
+            const { status } = await Notifications.getPermissionsAsync();
+            const allScheduled = await Notifications.getAllScheduledNotificationsAsync();
+
+            const debugText = `
+Notification Status:
+- Permission: ${status}
+- Global Enabled: ${notificationsEnabled}
+- Bill Reminders: ${enableReminders}
+- Scheduled Notifications: ${allScheduled.length}
+- Due Date: ${dueDate.toISOString()}
+- Reminder Time: ${reminderTime}
+            `.trim();
+
+            setDebugInfo(debugText);
+            console.log(debugText);
+            console.log('All scheduled:', allScheduled);
+
+            return status;
+        } catch (error) {
+            console.error('Debug error:', error);
+            setDebugInfo(`Debug error: ${error.message}`);
+            return 'error';
+        }
+    };
+
+    // Test notification function
+    const handleTestNotification = async () => {
+        try {
+            await scheduleTestNotification();
+            Alert.alert('Success', 'Test notification sent! Check your device.');
+        } catch (error) {
+            Alert.alert('Error', `Failed to send test: ${error.message}`);
+        }
+    };
+
     const handleAddBill = async () => {
         if (!billName.trim() || !amount || !category) {
             Alert.alert('Missing Information', 'Please fill in all required fields.');
@@ -288,6 +333,14 @@ const AddBill = () => {
             const [hours, minutes] = reminderTime.split(':').map(Number);
             dueDateWithTime.setHours(hours, minutes, 0, 0);
 
+            // Check if due date is in the future
+            const now = new Date();
+            if (dueDateWithTime <= now) {
+                Alert.alert('Invalid Date', 'Please select a future date and time for the bill.');
+                setIsLoading(false);
+                return;
+            }
+
             const billData = {
                 name: billName.trim(),
                 amount: amountValue,
@@ -305,18 +358,48 @@ const AddBill = () => {
             };
 
             const docRef = await addDoc(collection(db, 'bills'), billData);
+            console.log('Bill created with ID:', docRef.id);
+
+            let notificationScheduled = false;
+            let notificationError = null;
 
             // Schedule notification if reminders are enabled
             if (enableReminders && notificationsEnabled) {
-                await scheduleBillReminder({
-                    ...billData,
-                    id: docRef.id
-                });
+                try {
+                    // Double-check permissions
+                    const { status } = await Notifications.getPermissionsAsync();
+                    if (status !== 'granted') {
+                        console.log('No notification permissions, requesting...');
+                        const granted = await requestPermissions();
+                        if (!granted) {
+                            throw new Error('Notification permissions not granted');
+                        }
+                    }
+
+                    await scheduleBillReminder({
+                        ...billData,
+                        id: docRef.id
+                    });
+                    notificationScheduled = true;
+                    console.log('Bill reminder scheduled successfully');
+                } catch (notificationError) {
+                    console.error('Failed to schedule notification:', notificationError);
+                    notificationError = notificationError.message;
+                    // Don't fail the entire bill creation if notification fails
+                }
             }
+
+            const successMessage = `"${billData.name}" has been added successfully.${
+                enableReminders && notificationsEnabled
+                    ? notificationScheduled
+                        ? `\n\n✅ You'll be reminded on ${formatDate(dueDate)} at ${formatTimeDisplay(reminderTime)}`
+                        : `\n\n⚠️ Bill saved but reminder failed: ${notificationError}`
+                    : ''
+            }`;
 
             Alert.alert(
                 'Success! 🎉',
-                `"${billData.name}" has been added successfully.${enableReminders && notificationsEnabled ? `\n\nYou'll be reminded on ${formatDate(dueDate)} at ${formatTimeDisplay(reminderTime)}` : ''}`,
+                successMessage,
                 [
                     {
                         text: 'Add Another',
@@ -332,7 +415,7 @@ const AddBill = () => {
             );
         } catch (error) {
             console.error('Error adding bill: ', error);
-            Alert.alert('Error', 'Failed to add bill. Please try again.');
+            Alert.alert('Error', `Failed to add bill: ${error.message}`);
         } finally {
             setIsLoading(false);
         }
@@ -347,6 +430,7 @@ const AddBill = () => {
         setNotes('');
         setIsRecurring(false);
         setEnableReminders(notificationsEnabled);
+        setDebugInfo('');
     };
 
     const formatDate = (date) => {
@@ -405,7 +489,30 @@ const AddBill = () => {
             >
                 <Text style={styles.title}>Add New Bill</Text>
                 <Text style={styles.subtitle}>Track your expenses effortlessly</Text>
+
+                {/* Debug Button - Remove in production */}
+                {__DEV__ && (
+                    <TouchableOpacity
+                        style={styles.debugButton}
+                        onPress={checkNotificationStatus}
+                    >
+                        <Text style={styles.debugButtonText}>🔧 Debug</Text>
+                    </TouchableOpacity>
+                )}
             </Animated.View>
+
+            {/* Debug Info */}
+            {debugInfo ? (
+                <View style={styles.debugInfo}>
+                    <Text style={styles.debugInfoText}>{debugInfo}</Text>
+                    <TouchableOpacity
+                        style={styles.testButton}
+                        onPress={handleTestNotification}
+                    >
+                        <Text style={styles.testButtonText}>Test Notification</Text>
+                    </TouchableOpacity>
+                </View>
+            ) : null}
 
             {/* Form */}
             <Animated.View
@@ -727,6 +834,45 @@ const createStyles = (colors, isDark) => StyleSheet.create({
         fontSize: 16,
         color: colors.textSecondary,
         fontWeight: '500',
+    },
+    debugButton: {
+        marginTop: 8,
+        padding: 8,
+        backgroundColor: colors.primaryLight,
+        borderRadius: 8,
+        alignSelf: 'flex-start',
+    },
+    debugButtonText: {
+        fontSize: 12,
+        color: colors.primary,
+        fontWeight: '600',
+    },
+    debugInfo: {
+        margin: 20,
+        marginTop: 0,
+        padding: 16,
+        backgroundColor: isDark ? '#1e293b' : '#f1f5f9',
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: isDark ? '#334155' : '#e2e8f0',
+    },
+    debugInfoText: {
+        fontSize: 12,
+        color: colors.textSecondary,
+        fontFamily: 'monospace',
+        lineHeight: 16,
+    },
+    testButton: {
+        marginTop: 8,
+        padding: 8,
+        backgroundColor: colors.primary,
+        borderRadius: 6,
+        alignSelf: 'flex-start',
+    },
+    testButtonText: {
+        fontSize: 12,
+        color: '#fff',
+        fontWeight: '600',
     },
     form: {
         padding: 20,
