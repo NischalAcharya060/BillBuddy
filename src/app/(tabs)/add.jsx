@@ -206,7 +206,6 @@ const AddBill = () => {
         notificationsEnabled,
         scheduleBillReminder,
         requestPermissions,
-        scheduleTestNotification
     } = useNotifications();
     const router = useRouter();
     const [billName, setBillName] = useState('');
@@ -220,7 +219,6 @@ const AddBill = () => {
     const [isRecurring, setIsRecurring] = useState(false);
     const [enableReminders, setEnableReminders] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
-    const [debugInfo, setDebugInfo] = useState('');
 
     const colors = isDark ? darkColors : lightColors;
     const styles = createStyles(colors, isDark);
@@ -268,44 +266,6 @@ const AddBill = () => {
         { id: 'phone', name: 'Phone', icon: 'call', color: '#8B5CF6', gradient: ['#8B5CF6', '#7C3AED'] },
         { id: 'other', name: 'Other', icon: 'ellipsis-horizontal', color: colors.textTertiary, gradient: isDark ? ['#64748b', '#475569'] : ['#6B7280', '#4B5563'] },
     ];
-
-    // Debug function to check notification status
-    const checkNotificationStatus = async () => {
-        try {
-            const { status } = await Notifications.getPermissionsAsync();
-            const allScheduled = await Notifications.getAllScheduledNotificationsAsync();
-
-            const debugText = `
-Notification Status:
-- Permission: ${status}
-- Global Enabled: ${notificationsEnabled}
-- Bill Reminders: ${enableReminders}
-- Scheduled Notifications: ${allScheduled.length}
-- Due Date: ${dueDate.toISOString()}
-- Reminder Time: ${reminderTime}
-            `.trim();
-
-            setDebugInfo(debugText);
-            console.log(debugText);
-            console.log('All scheduled:', allScheduled);
-
-            return status;
-        } catch (error) {
-            console.error('Debug error:', error);
-            setDebugInfo(`Debug error: ${error.message}`);
-            return 'error';
-        }
-    };
-
-    // Test notification function
-    const handleTestNotification = async () => {
-        try {
-            await scheduleTestNotification();
-            Alert.alert('Success', 'Test notification sent! Check your device.');
-        } catch (error) {
-            Alert.alert('Error', `Failed to send test: ${error.message}`);
-        }
-    };
 
     const handleAddBill = async () => {
         if (!billName.trim() || !amount || !category) {
@@ -430,7 +390,6 @@ Notification Status:
         setNotes('');
         setIsRecurring(false);
         setEnableReminders(notificationsEnabled);
-        setDebugInfo('');
     };
 
     const formatDate = (date) => {
@@ -489,30 +448,7 @@ Notification Status:
             >
                 <Text style={styles.title}>Add New Bill</Text>
                 <Text style={styles.subtitle}>Track your expenses effortlessly</Text>
-
-                {/* Debug Button - Remove in production */}
-                {__DEV__ && (
-                    <TouchableOpacity
-                        style={styles.debugButton}
-                        onPress={checkNotificationStatus}
-                    >
-                        <Text style={styles.debugButtonText}>🔧 Debug</Text>
-                    </TouchableOpacity>
-                )}
             </Animated.View>
-
-            {/* Debug Info */}
-            {debugInfo ? (
-                <View style={styles.debugInfo}>
-                    <Text style={styles.debugInfoText}>{debugInfo}</Text>
-                    <TouchableOpacity
-                        style={styles.testButton}
-                        onPress={handleTestNotification}
-                    >
-                        <Text style={styles.testButtonText}>Test Notification</Text>
-                    </TouchableOpacity>
-                </View>
-            ) : null}
 
             {/* Form */}
             <Animated.View
@@ -834,45 +770,6 @@ const createStyles = (colors, isDark) => StyleSheet.create({
         fontSize: 16,
         color: colors.textSecondary,
         fontWeight: '500',
-    },
-    debugButton: {
-        marginTop: 8,
-        padding: 8,
-        backgroundColor: colors.primaryLight,
-        borderRadius: 8,
-        alignSelf: 'flex-start',
-    },
-    debugButtonText: {
-        fontSize: 12,
-        color: colors.primary,
-        fontWeight: '600',
-    },
-    debugInfo: {
-        margin: 20,
-        marginTop: 0,
-        padding: 16,
-        backgroundColor: isDark ? '#1e293b' : '#f1f5f9',
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: isDark ? '#334155' : '#e2e8f0',
-    },
-    debugInfoText: {
-        fontSize: 12,
-        color: colors.textSecondary,
-        fontFamily: 'monospace',
-        lineHeight: 16,
-    },
-    testButton: {
-        marginTop: 8,
-        padding: 8,
-        backgroundColor: colors.primary,
-        borderRadius: 6,
-        alignSelf: 'flex-start',
-    },
-    testButtonText: {
-        fontSize: 12,
-        color: '#fff',
-        fontWeight: '600',
     },
     form: {
         padding: 20,
