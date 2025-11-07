@@ -1,50 +1,98 @@
-# Welcome to your Expo app 👋
+# 🧾 BillBuddy — Expense & Bill Tracker
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+BillBuddy helps you **manage your monthly bills, track expenses, and set reminders** — all in one clean, modern app.
 
-## Get started
+---
 
-1. Install dependencies
+## 🚀 Get Started
 
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+1️⃣ **Install dependencies**
 
 ```bash
-npm run reset-project
+  npm install
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+2️⃣ **Start the app**
 
-## Learn more
+```bash
+  npx expo start
+```
 
-To learn more about developing your project with Expo, look at the following resources:
+---
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+## ✨ Features
 
-## Join the community
+- 📅 Add & manage monthly bills (electricity, rent, Wi-Fi, etc.)
+- 🔔 Get payment reminders before due dates
+- 📊 Visualize spending with expense charts
+- 👥 Split bills with friends
+- 🎨 Dark / Light mode support
 
-Join our community of developers creating universal apps.
+### 📱 Dashboard
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+[![IMG-4360.jpg](https://i.postimg.cc/L6fxRJ3w/IMG-4360.jpg)](https://postimg.cc/WhNGwbKw)
+
+### 💵 Manage Bills
+
+[![IMG-4361.jpg](https://i.postimg.cc/RVfg9WL2/IMG-4361.jpg)](https://postimg.cc/ppWfJX7B)
+
+### 💱 Currency Converter
+
+[![IMG-4362.jpg](https://i.postimg.cc/0yscN9Vt/IMG-4362.jpg)](https://postimg.cc/dL58HcPd)
+
+### ⚙️ Settings
+
+[![IMG-4363.jpg](https://i.postimg.cc/bwh3vqmm/IMG-4363.jpg)](https://postimg.cc/vc0WqwFn)
+
+---
+
+## 🛠️ Tech Stack
+
+- **Framework:** React Native (Expo)  
+- **Language:** JavaScript / TypeScript  
+- **UI Library:** React Native Paper / NativeWind (Tailwind for RN)  
+- **Navigation:** React Navigation  
+- **Backend (optional):** Firebase Firestore  
+- **Build System:** EAS Build  
+
+---
+
+## 📦 EAS Build Configuration
+
+BillBuddy uses **Expo Application Services (EAS)** for building APKs & publishing updates.
+
+### Example `app.json` configuration
+
+```json
+{
+  "expo": {
+    "name": "BillBuddy",
+    "slug": "billbuddy",
+    "android": {
+      "package": "com.grdh_ravan.BillBuddy",
+      "versionCode": 2
+    },
+    "ios": {
+      "bundleIdentifier": "com.grdh_ravan.BillBuddy"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "your-project-id-here"
+      }
+    }
+  }
+}
+```
+
+### Generate your `projectId` automatically
+
+```bash
+  eas build:configure
+```
+
+---
+
+## 🧠 Author
+
+**Nischal Acharya**  
+📍 Developer | Designer | Innovator  
