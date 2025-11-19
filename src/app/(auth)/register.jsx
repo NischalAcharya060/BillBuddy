@@ -15,7 +15,7 @@ const Register = () => {
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-    const { signUp } = useAuth();
+    const { signUp, signInWithGoogle, googleLoading } = useAuth();
     const router = useRouter();
 
     const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -67,6 +67,21 @@ const Register = () => {
             Alert.alert('Error', 'An unexpected error occurred. Please try again.');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleGoogleSignIn = async () => {
+        try {
+            const result = await signInWithGoogle();
+
+            if (result && !result.success) {
+                const errorMessage = result?.error || 'Google Sign-In failed. Please try again.';
+                Alert.alert('Google Sign-In Failed', errorMessage);
+            }
+            // Success is handled automatically by AuthContext
+        } catch (error) {
+            console.error('Google Sign-In error:', error);
+            Alert.alert('Error', 'An unexpected error occurred during Google Sign-In.');
         }
     };
 
@@ -232,6 +247,31 @@ const Register = () => {
                         </LinearGradient>
                     </TouchableOpacity>
 
+                    {/* Divider */}
+                    <View style={styles.divider}>
+                        <View style={styles.dividerLine} />
+                        <Text style={styles.dividerText}>or</Text>
+                        <View style={styles.dividerLine} />
+                    </View>
+
+                    {/* Google Sign-In Button */}
+                    <TouchableOpacity
+                        style={[styles.googleButton, googleLoading && styles.buttonDisabled]}
+                        onPress={handleGoogleSignIn}
+                        disabled={googleLoading}
+                    >
+                        <View style={styles.googleButtonContent}>
+                            {googleLoading ? (
+                                <ActivityIndicator size="small" color="#666" />
+                            ) : (
+                                <>
+                                    <Ionicons name="logo-google" size={20} color="#DB4437" />
+                                    <Text style={styles.googleButtonText}>Continue with Google</Text>
+                                </>
+                            )}
+                        </View>
+                    </TouchableOpacity>
+
                     {/* Sign In Link */}
                     <View style={styles.signInContainer}>
                         <Text style={styles.signInText}>Already have an account? </Text>
@@ -383,6 +423,46 @@ const styles = StyleSheet.create({
         color: '#fff',
         fontSize: 18,
         fontWeight: '600',
+    },
+    divider: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginVertical: 24,
+    },
+    dividerLine: {
+        flex: 1,
+        height: 1,
+        backgroundColor: '#E5E7EB',
+    },
+    dividerText: {
+        marginHorizontal: 16,
+        color: '#6B7280',
+        fontSize: 14,
+        fontWeight: '500',
+    },
+    googleButton: {
+        backgroundColor: '#fff',
+        borderWidth: 1,
+        borderColor: '#D1D5DB',
+        borderRadius: 16,
+        paddingVertical: 16,
+        marginBottom: 24,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
+    },
+    googleButtonContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 12,
+    },
+    googleButtonText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#374151',
     },
     signInContainer: {
         flexDirection: 'row',
