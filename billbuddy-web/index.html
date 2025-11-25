@@ -4,71 +4,127 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>BillBuddy – Smart Bill Management App</title>
+
     <style>
-        body {
+        /* Reset */
+        * {
             margin: 0;
-            font-family: Arial, sans-serif;
-            background: #f7f9fc;
-            color: #333;
+            padding: 0;
+            box-sizing: border-box;
         }
+
+        body {
+            font-family: "Inter", Arial, sans-serif;
+            background: #f0f3fa;
+            color: #2f2f2f;
+            line-height: 1.6;
+        }
+
         header {
-            background: #4a6cf7;
-            padding: 30px;
+            background: linear-gradient(135deg, #4a6cf7, #6f8bff);
+            padding: 80px 20px;
             text-align: center;
             color: white;
         }
+
         header h1 {
-            margin: 0;
-            font-size: 40px;
+            margin-bottom: 10px;
+            font-size: 50px;
+            font-weight: 800;
+            letter-spacing: -1px;
         }
+
+        header p {
+            font-size: 20px;
+            opacity: 0.9;
+        }
+
         .section {
-            padding: 40px 20px;
-            max-width: 900px;
-            margin: auto;
             background: white;
-            border-radius: 12px;
-            box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+            max-width: 900px;
+            margin: -40px auto 60px auto;
+            padding: 50px;
+            border-radius: 20px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+            animation: fadeIn 0.5s ease-in-out;
         }
+
         h2 {
             color: #4a6cf7;
+            margin-bottom: 12px;
+            font-size: 28px;
+            font-weight: 700;
         }
-        footer {
-            text-align: center;
-            padding: 20px;
-            color: #777;
-            font-size: 14px;
+
+        p {
+            font-size: 17px;
+            margin-bottom: 25px;
+            color: #444;
         }
-        a {
-            color: #4a6cf7;
-            text-decoration: none;
-        }
+
         .links {
-            margin-top: 20px;
+            margin-top: 30px;
         }
+
         .links a {
             display: inline-block;
-            margin-right: 20px;
+            margin-right: 25px;
             font-weight: bold;
+            font-size: 16px;
+            color: #4a6cf7;
+            text-decoration: none;
+            transition: 0.3s ease;
+            padding-bottom: 3px;
+            border-bottom: 2px solid transparent;
         }
+
+        .links a:hover {
+            border-bottom: 2px solid #4a6cf7;
+        }
+
+        footer {
+            text-align: center;
+            padding: 25px;
+            color: #777;
+            font-size: 14px;
+            margin-top: 40px;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
     </style>
 </head>
+
 <body>
 
 <header>
     <h1>BillBuddy</h1>
-    <p>Your smart app for managing bills and expenses effortlessly</p>
+    <p>Effortless bill tracking, reminders & smart expense management</p>
 </header>
 
 <div class="section">
     <h2>About BillBuddy</h2>
     <p>
-        BillBuddy is a mobile application designed to help users track bills, payments,
-        reminders, and spending habits easily. The app provides a clean and intuitive
-        experience for managing monthly expenses.
+        BillBuddy is a smart mobile application that helps users keep track of recurring bills,
+        payment reminders, due dates, and monthly expenses. It’s designed with simplicity and
+        efficiency in mind, allowing you to stay in control of your finances effortlessly.
     </p>
 
     <h2>Contact Information</h2>
-    <p>Email: <a href="mailto:nischal060@gmail.com">nischal060@gmail.com</a></p>
+    <p>
+        If you have questions or need support, feel free to reach out:
+        <strong>Email:</strong>
+        <a href="mailto:nischal060@gmail.com" style="color:#4a6cf7;">nischal060@gmail.com</a>
+    </p>
 
     <div class="links">
         <a href="./privacy-policy.html">Privacy Policy</a>
